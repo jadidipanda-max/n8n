@@ -294,6 +294,7 @@ tr.click:hover td { background: var(--surface-2); }
   function joursDepuis(iso) { if (!iso) return null; return Math.max(0, Math.round((Date.now() - new Date(iso + "T00:00:00").getTime()) / MS_JOUR)); }
   function r(id) { return res[id] || { statut: null, note: "", rappelLe: "", historique: [] }; }
   function hist(id) { return (res[id] && res[id].historique) || []; }
+  function nomGerant(l) { return l.dirigeant || (res[l.id] && res[l.id].gerant) || ""; }
   function pill(st) { if (!st) return '<span class="pill s-none">À appeler</span>'; return '<span class="pill s-' + st + '">' + ICONS[st] + esc(LABEL[st]) + "</span>"; }
 
   // ---------- Filtres ----------
@@ -310,7 +311,7 @@ tr.click:hover td { background: var(--surface-2); }
     var list = leads.filter(function (l) {
       if (!inFiltre(l, ui.filtre)) return false;
       if (ui.niche && l.niche !== ui.niche) return false;
-      if (q) { var h = [l.annonceur, l.dirigeant, l.ville, l.tel, l.entreprise].join(" ").toLowerCase(); if (h.indexOf(q) < 0 && h.replace(/\s/g, "").indexOf(q.replace(/\s/g, "")) < 0) return false; }
+      if (q) { var h = [l.annonceur, nomGerant(l), l.ville, l.tel, l.entreprise].filter(Boolean).join(" ").toLowerCase(); if (h.indexOf(q) < 0 && h.replace(/\s/g, "").indexOf(q.replace(/\s/g, "")) < 0) return false; }
       return true;
     });
     if (ui.filtre === "rappel") {
@@ -387,6 +388,15 @@ tr.click:hover td { background: var(--surface-2); }
     setSave("…");
     noteTimer = setTimeout(function () { write(id); renderCrmIfVisible(); }, 700);
   }
+  var gerantTimer = null;
+  function setGerant(id, txt) {
+    var cur = JSON.parse(JSON.stringify(r(id)));
+    cur.gerant = txt.trim(); cur.maj = new Date().toISOString();
+    res[id] = cur;
+    clearTimeout(gerantTimer);
+    setSave("…");
+    gerantTimer = setTimeout(function () { write(id); renderRail(); }, 700);
+  }
   function setRappel(id, v) {
     var cur = JSON.parse(JSON.stringify(r(id)));
     cur.rappelLe = v; cur.maj = new Date().toISOString();
@@ -412,7 +422,7 @@ tr.click:hover td { background: var(--surface-2); }
     if (!loaded.leads) { root.innerHTML = stateBox("Chargement des leads…", "Les fiches des gérants à appeler vont s'afficher ici."); return; }
     if (!leads.length) { root.innerHTML = stateBox("Aucune lead pour l'instant", "Les leads sont ajoutées par Claude. Elles apparaîtront ici, classées de la plus qualifiée à la moins qualifiée."); return; }
 
-    var focusNote = document.activeElement && document.activeElement.id === "note";
+    var focusNote = document.activeElement && /^(note|gerant|rappelLe)$/.test(document.activeElement.id);
     if (!full && focusNote) { renderRail(); renderSheetStatus(); return; }
     if (!$("rail")) {
       root.innerHTML = '<div class="desk"><aside class="rail" id="rail"></aside><article class="sheet" id="sheet"></article></div>';
@@ -436,8 +446,8 @@ tr.click:hover td { background: var(--surface-2); }
       niches.map(function (n) { return '<option' + (ui.niche === n ? " selected" : "") + ">" + esc(n) + "</option>"; }).join("") +
       '</select><input class="field" id="q" type="search" placeholder="Nom, ville, numéro…" value="' + esc(ui.q) + '" aria-label="Rechercher"></div></div>' +
       '<div class="list" id="list">' + (v.length ? v.map(function (l) {
-        var rr = r(l.id);
-        return '<button class="item" data-id="' + l.id + '" aria-current="' + (cur && cur.id === l.id) + '"><span class="rk">' + l.ordre + '</span><span class="nm">' + esc(l.dirigeant) + '</span><span class="sc" title="Score">' + l.score + '</span><span class="sub">' + esc(l.annonceur) + " · " + esc(l.ville || shortDept(l.dept)) + "</span>" + pill(rr.statut) + "</button>";
+        var rr = r(l.id), nm = nomGerant(l);
+        return '<button class="item" data-id="' + l.id + '" aria-current="' + (cur && cur.id === l.id) + '"><span class="rk">' + l.ordre + '</span><span class="nm">' + esc(nm || l.annonceur) + '</span><span class="sc" title="Score">' + l.score + '</span><span class="sub">' + (nm ? esc(l.annonceur) : '<i>Gérant à identifier</i>') + " · " + esc(l.ville || shortDept(l.dept)) + "</span>" + pill(rr.statut) + "</button>";
       }).join("") : '<div class="empty-list">' + (ui.filtre === "todo" && !ui.q && !ui.niche ? "Toutes les leads ont été appelées. Passe sur « À rappeler »." : "Aucune lead dans ce filtre.") + "</div>") + "</div>";
     $("list").scrollTop = listScroll;
     if (qFocus) { var qi = $("q"); qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); }
@@ -461,7 +471,7 @@ tr.click:hover td { background: var(--surface-2); }
     var l = current(); var sheet = $("sheet");
     if (!l) { sheet.innerHTML = ""; return; }
     ui.cur = l.id;
-    var rr = r(l.id);
+    var rr = r(l.id), nm = nomGerant(l);
     var j = joursDepuis(l.dernierePub);
     var aConf = /confirmer/i.test(l.source || "");
     var metaNom = /Meta/.test(l.qualite || "");
@@ -476,14 +486,14 @@ tr.click:hover td { background: var(--surface-2); }
 
     sheet.innerHTML =
       '<div class="sheet-sec">' +
-        '<div class="meta"><span class="rank">N° ' + l.ordre + ' / ' + leads.length + '</span><span>Score <span class="score">' + l.score + '</span></span><span class="tag">' + esc(l.niche) + '</span><span>' + esc(l.dept || "") + '</span>' + (l.idf === "Oui" ? '<span class="tag">Île-de-France · démo sur place</span>' : "") + pill(rr.statut) + "</div>" +
-        '<div class="who"><div style="min-width:0"><h1>' + esc(l.dirigeant) + '</h1><div class="role">' + esc(metaNom ? "Titulaire des pubs (nom déclaré à Meta)" : (l.qualite || "")) + '</div><div class="biz">' + esc(l.annonceur) + (l.entreprise && l.entreprise.toLowerCase().indexOf(l.annonceur.toLowerCase()) < 0 ? " <span>· " + esc(l.entreprise) + "</span>" : "") + (l.ville ? " <span>· " + esc(l.ville) + "</span>" : "") + "</div></div>" +
+        '<div class="meta"><span class="rank">N° ' + l.ordre + ' / ' + leads.length + '</span><span>Score <span class="score">' + l.score + '</span></span><span class="tag">' + esc(l.niche) + '</span><span>' + esc(l.dept || "") + '</span>' + (l.idf === "Oui" ? '<span class="tag">Île-de-France · démo sur place</span>' : "") + (l.dirigeant ? "" : '<span class="tag">Sans nom de gérant</span>') + pill(rr.statut) + "</div>" +
+        '<div class="who"><div style="min-width:0">' + (nm ? '<h1>' + esc(nm) + '</h1><div class="role">' + esc(!l.dirigeant ? "Nom noté pendant l'appel" : metaNom ? "Titulaire des pubs (nom déclaré à Meta)" : (l.qualite || "")) + '</div><div class="biz">' + esc(l.annonceur) : '<h1>' + esc(l.annonceur) + '</h1><div class="role">Gérant à identifier : demande-le dès le début de l\'appel</div><div class="biz">' + esc(l.niche)) + (l.entreprise && l.entreprise.toLowerCase().indexOf(l.annonceur.toLowerCase()) < 0 ? " <span>· " + esc(l.entreprise) + "</span>" : "") + (l.ville ? " <span>· " + esc(l.ville) + "</span>" : "") + "</div></div>" +
           '<div class="phone"><div class="digits" id="digits">' + esc(l.tel) + '</div><div class="acts"><a class="btn primary" href="tel:' + esc(l.tel.replace(/\s/g, "")) + '">' + ICONS.phone + 'Appeler</a><button class="btn" id="copyTel">' + ICONS.copy + '<span>Copier</span></button></div><div class="src">' + esc(l.source || "") + (l.fiabilite ? " · rapprochement " + esc(String(l.fiabilite).toLowerCase()) : "") + "</div>" + (l.telFixe ? '<div class="src">Standard : <span class="num" style="font-family:var(--font-mono)">' + esc(l.telFixe) + "</span></div>" : "") + "</div></div>" +
         (aConf ? '<div class="warn">Numéro à confirmer : commence par « Je suis bien chez ' + esc(l.annonceur) + " ? »</div>" : "") +
         (l.noteXls ? '<div class="xlsnote"><b>À savoir :</b> ' + esc(l.noteXls) + "</div>" : "") +
       "</div>" +
       '<div class="sheet-sec script">' +
-        '<div><div class="lbl">Ouverture</div><div class="ask">« Bonjour, <b>' + esc(l.dirigeant) + "</b> ? Jay, de J-Square. »</div></div>" +
+        '<div><div class="lbl">Ouverture</div><div class="ask">' + (nm ? "« Bonjour, <b>" + esc(nm) + "</b> ? Jay, de J-Square. »" : "« Bonjour, je suis bien avec le gérant ou la gérante de <b>" + esc(l.annonceur) + "</b> ? Jay, de J-Square. »") + "</div></div>" +
         '<div><div class="lbl">Accroche</div><div class="hook">' + esc(l.accroche || "") + "</div></div>" +
         '<div><div class="lbl">Pourquoi ça peut signer vite</div><div class="why">' + why.map(function (w) { return "<span>" + esc(w) + "</span>"; }).join("") + "</div></div>" +
         '<div class="legal">À dire dès le début : ses coordonnées viennent de ' + srcCoord + ", du registre des entreprises et de la bibliothèque publicitaire Meta ; il peut refuser d'être rappelé (dans ce cas : « Pas intéressé »).</div>" +
@@ -496,6 +506,7 @@ tr.click:hover td { background: var(--surface-2); }
       '<div class="sheet-sec"><div class="lbl">Résultat de l\'appel</div><div class="outcomes">' +
         STATUTS.map(function (s, i) { return '<button class="oc s-' + s.k + '" data-s="' + s.k + '" aria-pressed="' + (rr.statut === s.k) + '"' + dis + ">" + ICONS[s.k] + "<span>" + s.label + "</span><kbd>" + (i + 1) + "</kbd></button>"; }).join("") +
       '</div><div class="callback" id="callbackRow"' + (rr.statut === "rappeler" ? "" : " hidden") + '><label for="rappelLe">Rappeler le</label><input class="field" type="datetime-local" id="rappelLe" value="' + esc(rr.rappelLe || "") + '"' + dis + "></div>" +
+        (l.dirigeant ? "" : '<div style="margin-top:14px"><label class="lbl" for="gerant">Nom du gérant</label><input class="field" id="gerant" placeholder="Prénom et nom, noté pendant l\'appel" value="' + esc(rr.gerant || "") + '"' + dis + "></div>") +
         '<div style="margin-top:14px"><label class="lbl" for="note">Notes</label><textarea class="field" id="note" placeholder="Nb de demandes par mois, délai de rappel actuel, objection, qui décide…"' + dis + ">" + esc(rr.note || "") + '</textarea><div class="savestate" id="savestate"></div></div>' +
         '<ul class="hist" id="histList">' + histHtml(l.id) + "</ul>" +
       "</div>" +
@@ -552,7 +563,7 @@ tr.click:hover td { background: var(--surface-2); }
       "</tbody></table></div></div>" +
       '<div class="panel"><div class="panel-head"><div><h3>À suivre</h3><div class="sub">RDV démo, intéressés et rappels prévus · clique une ligne pour ouvrir la fiche</div></div><button class="btn" id="copyCsv">' + ICONS.copy + '<span>Copier tout pour Excel</span></button></div>' +
         (relance.length ? '<div class="tablewrap"><table><thead><tr><th>Statut</th><th>Gérant</th><th>Entreprise</th><th>Téléphone</th><th>Rappeler le</th><th>Notes</th></tr></thead><tbody>' +
-          relance.map(function (l) { var rr = r(l.id); return '<tr class="click" data-id="' + l.id + '"><td>' + pill(rr.statut) + "</td><td>" + esc(l.dirigeant) + "</td><td>" + esc(l.annonceur) + '</td><td class="num" style="font-family:var(--font-mono)">' + esc(l.tel) + "</td><td>" + (rr.rappelLe ? esc(fmtDT(rr.rappelLe)) : "—") + '</td><td class="note">' + esc(rr.note || "") + "</td></tr>"; }).join("") +
+          relance.map(function (l) { var rr = r(l.id); return '<tr class="click" data-id="' + l.id + '"><td>' + pill(rr.statut) + "</td><td>" + esc(nomGerant(l) || "—") + "</td><td>" + esc(l.annonceur) + '</td><td class="num" style="font-family:var(--font-mono)">' + esc(l.tel) + "</td><td>" + (rr.rappelLe ? esc(fmtDT(rr.rappelLe)) : "—") + '</td><td class="note">' + esc(rr.note || "") + "</td></tr>"; }).join("") +
           "</tbody></table></div>" : '<div class="empty-list" style="padding:8px 0">Rien pour l\'instant : les gérants intéressés, les RDV et les rappels apparaîtront ici.</div>') +
       "</div></div>";
     drawChart();
@@ -608,7 +619,7 @@ tr.click:hover td { background: var(--surface-2); }
     var head = ["N°", "Score", "Niche", "Annonceur", "Gérant", "Téléphone", "Ville", "Statut", "Rappeler le", "Nb d'appels", "Dernier appel", "Notes"];
     var rows = leads.map(function (l) {
       var rr = r(l.id), h = hist(l.id), last = h[h.length - 1];
-      return [l.ordre, l.score, l.niche, l.annonceur, l.dirigeant, l.tel, l.ville || "", rr.statut ? LABEL[rr.statut] : "À appeler", rr.rappelLe ? fmtDT(rr.rappelLe) : "", h.length, last ? fmtDT(last.t) : "", (rr.note || "").replace(/\s+/g, " ")];
+      return [l.ordre, l.score, l.niche, l.annonceur, nomGerant(l), l.tel, l.ville || "", rr.statut ? LABEL[rr.statut] : "À appeler", rr.rappelLe ? fmtDT(rr.rappelLe) : "", h.length, last ? fmtDT(last.t) : "", (rr.note || "").replace(/\s+/g, " ")];
     });
     return [head].concat(rows).map(function (row) { return row.map(function (c) { return String(c).replace(/\t/g, " "); }).join("\t"); }).join("\n");
   }
@@ -638,6 +649,7 @@ tr.click:hover td { background: var(--surface-2); }
   document.addEventListener("input", function (e) {
     if (e.target.id === "q") { ui.q = e.target.value; save("ui", ui); renderRail(); }
     if (e.target.id === "note") { var c = current(); if (c) setNote(c.id, e.target.value); }
+    if (e.target.id === "gerant") { var g = current(); if (g) setGerant(g.id, e.target.value); }
   });
   document.addEventListener("change", function (e) {
     if (e.target.id === "niche") { ui.niche = e.target.value; save("ui", ui); renderAppel(true); }
@@ -679,9 +691,9 @@ tr.click:hover td { background: var(--surface-2); }
       renderAll();
     }, function (e) { showBanner("Les leads ne se chargent plus (" + e.code + "). Recharge la page."); });
     db.collection("resultats").limit(1000).onSnapshot(function (snap) {
-      var editing = document.activeElement && document.activeElement.id === "note" ? ui.cur : null;
+      var editing = document.activeElement && /^(note|gerant)$/.test(document.activeElement.id) ? ui.cur : null;
       snap.docs.forEach(function (d) {
-        if (d.id === editing && res[d.id]) { var keep = res[d.id].note; res[d.id] = Object.assign({}, d.data(), { note: keep }); }
+        if (d.id === editing && res[d.id]) { res[d.id] = Object.assign({}, d.data(), { note: res[d.id].note, gerant: res[d.id].gerant }); }
         else res[d.id] = Object.assign({}, d.data());
       });
       snap.docChanges().forEach(function (ch) { if (ch.type === "removed") delete res[ch.doc.id]; });
