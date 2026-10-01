@@ -316,7 +316,8 @@ tr.click:hover td { background: var(--surface-2); }
   function inFiltre(l, f) {
     var s = r(l.id).statut;
     if (f === "todo") return !s;
-    if (f === "rappel") return s === "rappeler" || s === "no_rep";
+    if (f === "rappel") return s === "rappeler";
+    if (f === "norep") return s === "no_rep";
     if (f === "chaud") return s === "interesse" || s === "rdv";
     if (f === "non") return s === "pas_interesse";
     return true;
@@ -331,19 +332,16 @@ tr.click:hover td { background: var(--surface-2); }
       return true;
     });
     if (ui.filtre === "rappel") {
-      list.sort(function (a, b) {
-        var ra = r(a.id), rb = r(b.id);
-        var pa = ra.statut === "rappeler" ? 0 : 1, pb = rb.statut === "rappeler" ? 0 : 1;
-        if (pa !== pb) return pa - pb;
-        if (pa === 0) return String(ra.rappelLe || "9").localeCompare(String(rb.rappelLe || "9"));
-        return (hist(a.id).length - hist(b.id).length) || (a.ordre - b.ordre);
-      });
+      list.sort(function (a, b) { return String(r(a.id).rappelLe || "9").localeCompare(String(r(b.id).rappelLe || "9")) || (a.ordre - b.ordre); });
+    }
+    if (ui.filtre === "norep") {
+      list.sort(function (a, b) { return (hist(a.id).length - hist(b.id).length) || (a.ordre - b.ordre); });
     }
     return list;
   }
   function counts() {
-    var c = { todo: 0, rappel: 0, chaud: 0, non: 0, all: leads.length };
-    leads.forEach(function (l) { ["todo", "rappel", "chaud", "non"].forEach(function (f) { if (inFiltre(l, f)) c[f]++; }); });
+    var c = { todo: 0, rappel: 0, norep: 0, chaud: 0, non: 0, all: leads.length };
+    leads.forEach(function (l) { ["todo", "rappel", "norep", "chaud", "non"].forEach(function (f) { if (inFiltre(l, f)) c[f]++; }); });
     return c;
   }
   function current() {
@@ -356,7 +354,7 @@ tr.click:hover td { background: var(--surface-2); }
     var i = v.findIndex(function (l) { return l.id === cur.id; });
     var nxt;
     if (i >= 0) nxt = v[i + dir];
-    else if (ui.filtre === "rappel") nxt = v[dir > 0 ? 0 : v.length - 1];
+    else if (ui.filtre === "rappel" || ui.filtre === "norep") nxt = v[dir > 0 ? 0 : v.length - 1];
     else nxt = dir > 0 ? v.find(function (l) { return l.ordre > cur.ordre; }) : v.slice().reverse().find(function (l) { return l.ordre < cur.ordre; });
     if (!nxt) nxt = v.find(function (l) { return l.id !== cur.id; });
     if (nxt) { ui.cur = nxt.id; save("ui", ui); renderAppel(true); window.scrollTo({ top: 0 }); }
@@ -460,7 +458,7 @@ tr.click:hover td { background: var(--surface-2); }
     var c = counts();
     var niches = Array.from(new Set(leads.map(function (l) { return l.niche; }))).sort();
     var v = visible(), cur = current();
-    var chips = [["todo", "À appeler"], ["rappel", "À rappeler"], ["chaud", "Intéressés"], ["non", "Pas intéressés"], ["all", "Toutes"]];
+    var chips = [["todo", "À appeler"], ["rappel", "À rappeler"], ["norep", "Pas de réponse"], ["chaud", "Intéressés"], ["non", "Pas intéressés"], ["all", "Toutes"]];
     var rail = $("rail");
     var listScroll = $("list") ? $("list").scrollTop : 0;
     var qFocus = document.activeElement && document.activeElement.id === "q";
@@ -475,7 +473,7 @@ tr.click:hover td { background: var(--surface-2); }
       '<div class="list" id="list">' + (v.length ? v.map(function (l) {
         var rr = r(l.id), nm = nomGerant(l);
         return '<button class="item" data-id="' + l.id + '" aria-current="' + (cur && cur.id === l.id) + '"><span class="rk">' + l.ordre + '</span><span class="nm">' + esc(nm || l.annonceur) + '</span><span class="sc" title="Score">' + l.score + '</span><span class="sub">' + (nm ? esc(l.annonceur) : '<i>Gérant à identifier</i>') + " · " + esc(l.ville || shortDept(l.dept)) + "</span>" + pill(rr.statut) + "</button>";
-      }).join("") : '<div class="empty-list">' + (ui.filtre === "todo" && !ui.q && !ui.niche ? "Toutes les leads ont été appelées. Passe sur « À rappeler »." : "Aucune lead dans ce filtre.") + "</div>") + "</div>";
+      }).join("") : '<div class="empty-list">' + (ui.filtre === "todo" && !ui.q && !ui.niche ? "Toutes les leads ont été appelées. Passe sur « À rappeler » puis « Pas de réponse »." : "Aucune lead dans ce filtre.") + "</div>") + "</div>";
     $("list").scrollTop = listScroll;
     if (qFocus) { var qi = $("q"); qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); }
   }

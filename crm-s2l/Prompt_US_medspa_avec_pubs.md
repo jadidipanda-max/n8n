@@ -61,7 +61,7 @@ Page d'accueil + jusqu'à 5 pages internes (about, team, meet, founder, provider
 ## 8. Écran d'appel + CRM (tout en anglais)
 Artifact avec base de données partagée (capacité db). Charge d'abord « artifact-capabilities » et « artifact-design ». Leads par paquets de 50 dans « lots », résultats dans « resultats/<id> », un document par lead. Couleurs : bleu nuit et corail (change si Junior préfère).
 - Onglet « Call screen » :
-  - à gauche, la liste avec les filtres To call / Call back / Interested / Not interested / All, le filtre Florida/Texas et une recherche ;
+  - à gauche, la liste avec les filtres To call / Call back / No answer / Interested / Not interested / All (« Call back » ne montre QUE les rappels prévus, triés par date et heure ; « No answer » ne montre que les « pas de réponse », séparément), le filtre Florida/Texas et une recherche ;
   - à droite, la fiche.
 - En haut de la fiche :
   - N°, score, ville et État, et L'HEURE LOCALE DU LEAD EN DIRECT avec une pastille « good time to call » de 9 h à 18 h chez lui. Floride = heure de New York, sauf l'ouest de la Floride (Pensacola) ; Texas = heure de Chicago, sauf El Paso.
