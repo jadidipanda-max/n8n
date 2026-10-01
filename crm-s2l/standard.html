@@ -245,7 +245,10 @@ tr.click:hover td { background: var(--surface-2); }
 .pxbox .pxnote { margin-top: 6px; font-size: 12.5px; color: var(--muted); }
 
 /* Étude de marché */
-.mkbox { margin-top: 16px; padding: 14px; border: 1px dashed var(--line); border-radius: 10px; }
+.mkbox { margin-top: 16px; padding: 14px 16px; border: 1px solid var(--accent); border-left-width: 4px; border-radius: 10px; background: var(--accent-soft); }
+.mkt { font-weight: 600; font-size: 16px; }
+.mkt span { font-weight: 400; font-size: 13px; color: var(--muted); }
+.mk .field { background: var(--surface); }
 .mkrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
 .mkl { font-size: 13.5px; color: var(--muted); min-width: 150px; }
 .seg { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -308,7 +311,9 @@ h4.mkh { font-size: 12px; font-weight: 600; color: var(--muted); margin: 16px 0 
   var SATIS = [["oui", "Satisfait"], ["moyen", "Mitigé"], ["non", "Pas satisfait"]];
   var PRESTA_L = {}; PRESTA.forEach(function (p) { PRESTA_L[p[0]] = p[1]; });
   var SATIS_L = {}; SATIS.forEach(function (p) { SATIS_L[p[0]] = p[1]; });
-  var MK_HEAD = ["Qui gère ses pubs", "Prestataire", "Frais de gestion €/mois", "Budget pub €/mois", "Demandes/mois", "Satisfaction", "Fin d'engagement"];
+  var DUREE = [["m3", "Moins de 3 mois"], ["m6", "3 à 6 mois"], ["m12", "6 à 12 mois"], ["a2", "1 à 2 ans"], ["a2p", "Plus de 2 ans"]];
+  var DUREE_L = {}; DUREE.forEach(function (p) { DUREE_L[p[0]] = p[1]; });
+  var MK_HEAD = ["Qui gère ses pubs", "Prestataire", "Avec ce prestataire depuis", "Frais de gestion €/mois", "Budget pub €/mois", "Fait des pubs depuis", "Demandes/mois", "Satisfaction", "Fin d'engagement"];
   var MS_JOUR = 86400000;
 
   // ---------- État ----------
@@ -478,7 +483,7 @@ h4.mkh { font-size: 12px; font-weight: 600; color: var(--muted); margin: 16px 0 
   function filled(v) { return v !== "" && v != null; }
   function budgetMois(m) { if (!filled(m.budget)) return null; return m.unite === "mois" ? +m.budget : Math.round(+m.budget * 30); }
   function hasMk(m) { return Object.keys(m).some(function (k) { return k !== "unite" && filled(m[k]); }); }
-  function mkCols(rr) { var m = rr.marche || {}, b = budgetMois(m); return [PRESTA_L[m.presta] || "", m.nom || "", filled(m.frais) ? m.frais : "", b != null ? b : "", filled(m.demandes) ? m.demandes : "", SATIS_L[m.satis] || "", m.fin ? fmtD(m.fin) : ""]; }
+  function mkCols(rr) { var m = rr.marche || {}, b = budgetMois(m); return [PRESTA_L[m.presta] || "", m.nom || "", DUREE_L[m.prestaDepuis] || "", filled(m.frais) ? m.frais : "", b != null ? b : "", DUREE_L[m.pubsDepuis] || "", filled(m.demandes) ? m.demandes : "", SATIS_L[m.satis] || "", m.fin ? fmtD(m.fin) : ""]; }
   function numOrEmpty(v) { v = String(v || "").replace(",", ".").trim(); if (v === "") return ""; var n = parseFloat(v); return isNaN(n) ? "" : n; }
   function median(a) { if (!a.length) return null; a = a.slice().sort(function (x, y) { return x - y; }); var k = Math.floor(a.length / 2); return a.length % 2 ? a[k] : Math.round((a[k - 1] + a[k]) / 2); }
   var mkTimer = null;
@@ -499,16 +504,27 @@ h4.mkh { font-size: 12px; font-weight: 600; color: var(--muted); margin: 16px 0 
   function mkInner(id, dis) {
     var m = mk(id);
     var f = function (key, lab, type, val, ph) { return '<div><label for="mk_' + key + '">' + esc(lab) + '</label><input class="field" id="mk_' + key + '" type="' + type + '"' + (type === "number" ? ' min="0" inputmode="decimal"' : "") + ' value="' + esc(filled(val) ? val : "") + '" placeholder="' + esc(ph) + '"' + dis + "></div>"; };
-    return '<div class="lbl">Étude de marché · ce qu\'il a aujourd\'hui</div>' +
+    return '<div class="mkt">Ce qu\'il paie aujourd\'hui <span>· étude de marché, à remplir pendant l\'appel</span></div>' +
       '<div class="mkrow"><span class="mkl">Qui gère ses pubs ?</span>' + segHtml("presta", PRESTA, m.presta, dis) + "</div>" +
       '<div class="mk">' +
-        f("nom", "Nom du prestataire", "text", m.nom, "Agence, freelance…") +
-        f("frais", "Frais de gestion (€/mois)", "number", m.frais, "500") +
-        '<div><label for="mk_budget">Budget pub</label><div class="inl"><input class="field" id="mk_budget" type="number" min="0" inputmode="decimal" value="' + esc(filled(m.budget) ? m.budget : "") + '" placeholder="50"' + dis + '><select class="field" id="mk_unite" aria-label="Unité du budget"' + dis + '><option value="jour"' + (m.unite !== "mois" ? " selected" : "") + '>€/jour</option><option value="mois"' + (m.unite === "mois" ? " selected" : "") + ">€/mois</option></select></div></div>" +
+        f("frais", "Frais de gestion de son agence (€/mois)", "number", m.frais, "500") +
+        '<div><label for="mk_budget">Budget publicité</label><div class="inl"><input class="field" id="mk_budget" type="number" min="0" inputmode="decimal" value="' + esc(filled(m.budget) ? m.budget : "") + '" placeholder="50"' + dis + '><select class="field" id="mk_unite" aria-label="Unité du budget"' + dis + '><option value="jour"' + (m.unite !== "mois" ? " selected" : "") + '>€/jour</option><option value="mois"' + (m.unite === "mois" ? " selected" : "") + ">€/mois</option></select></div></div>" +
+        f("nom", "Nom de l'agence ou du freelance", "text", m.nom, "Agence Untel…") +
         f("demandes", "Demandes reçues / mois", "number", m.demandes, "30") +
         f("fin", "Fin d'engagement", "date", m.fin, "") +
       "</div>" +
+      '<div class="mkrow"><span class="mkl">Fait des pubs depuis</span>' + segHtml("pubsDepuis", DUREE, m.pubsDepuis, dis) + "</div>" +
+      '<div class="mkrow"><span class="mkl">Avec ce prestataire depuis</span>' + segHtml("prestaDepuis", DUREE, m.prestaDepuis, dis) + "</div>" +
       '<div class="mkrow"><span class="mkl">Content de ses résultats ?</span>' + segHtml("satis", SATIS, m.satis, dis) + "</div>";
+  }
+  function anciennete(rows) {
+    var g = {}; DUREE.forEach(function (d) { g[d[0]] = { n: 0, oui: 0, moyen: 0, non: 0 }; });
+    var any = false;
+    rows.forEach(function (l) { var m = mk(l.id), o = g[m.prestaDepuis]; if (!o) return; any = true; o.n++; if (m.satis) o[m.satis]++; });
+    if (!any) return "";
+    return '<h4 class="mkh">Satisfaction selon l\'ancienneté avec leur prestataire</h4><div class="tablewrap"><table><thead><tr><th>Avec leur prestataire depuis</th><th class="n">Leads</th><th class="n">Satisfaits</th><th class="n">Mitigés</th><th class="n">Pas satisfaits</th></tr></thead><tbody>' +
+      DUREE.filter(function (d) { return g[d[0]].n; }).map(function (d) { var o = g[d[0]]; return "<tr><td>" + esc(d[1]) + '</td><td class="n">' + o.n + '</td><td class="n">' + o.oui + '</td><td class="n">' + o.moyen + '</td><td class="n">' + o.non + "</td></tr>"; }).join("") +
+      "</tbody></table></div>";
   }
   function mkSection(id, dis) { return '<div class="mkbox" id="mkbox">' + mkInner(id, dis) + "</div>"; }
   function renderMk() { var b = $("mkbox"), c = current(); if (b && c) b.innerHTML = mkInner(c.id, canWrite ? "" : " disabled"); }
@@ -537,10 +553,11 @@ h4.mkh { font-size: 12px; font-weight: 600; color: var(--muted); margin: 16px 0 
         '<div class="tablewrap"><table><thead><tr><th>Qui gère ses pubs</th><th class="n">Leads</th><th class="n">Frais médians</th><th class="n">Budget médian</th><th class="n">Satisfaits</th><th class="n">Mitigés</th><th class="n">Pas satisfaits</th></tr></thead><tbody>' +
           order.filter(function (k) { return byP[k]; }).map(function (k) { var g = byP[k]; return "<tr><td>" + esc(PRESTA_L[k] || "Non renseigné") + '</td><td class="n">' + g.n + '</td><td class="n">' + eur(median(g.fr)) + '</td><td class="n">' + eur(median(g.bu)) + '</td><td class="n">' + g.oui + '</td><td class="n">' + g.moyen + '</td><td class="n">' + g.non + "</td></tr>"; }).join("") +
         "</tbody></table></div>" +
+        anciennete(rows) +
         (fins.length ? '<h4 class="mkh">Fins d\'engagement : rappelle juste avant</h4><div class="tablewrap"><table><thead><tr><th>Fin</th><th>Entreprise</th><th>Prestataire</th><th class="n">Frais</th><th>Statut</th></tr></thead><tbody>' +
           fins.map(function (l) { var m = mk(l.id); return '<tr class="click" data-id="' + l.id + '"><td>' + esc(fmtD(m.fin)) + "</td><td>" + esc(l.annonceur) + "</td><td>" + esc([PRESTA_L[m.presta], m.nom].filter(Boolean).join(" · ") || "—") + '</td><td class="n">' + eur(fraisOf(m)) + "</td><td>" + pill(r(l.id).statut) + "</td></tr>"; }).join("") + "</tbody></table></div>" : "") +
-        '<h4 class="mkh">Toutes les réponses</h4><div class="tablewrap"><table><thead><tr><th>Entreprise</th><th>Niche</th><th>Qui gère</th><th>Prestataire</th><th class="n">Frais/mois</th><th class="n">Budget/mois</th><th class="n">Demandes/mois</th><th>Satisfaction</th><th>Fin</th></tr></thead><tbody>' +
-          rows.map(function (l) { var m = mk(l.id); return '<tr class="click" data-id="' + l.id + '"><td>' + esc(l.annonceur) + "</td><td>" + esc(l.niche) + "</td><td>" + esc(PRESTA_L[m.presta] || "—") + "</td><td>" + esc(m.nom || "—") + '</td><td class="n">' + eur(fraisOf(m)) + '</td><td class="n">' + eur(budgetMois(m)) + '</td><td class="n">' + (filled(m.demandes) ? m.demandes : "—") + "</td><td>" + esc(SATIS_L[m.satis] || "—") + "</td><td>" + (m.fin ? esc(fmtD(m.fin)) : "—") + "</td></tr>"; }).join("") +
+        '<h4 class="mkh">Toutes les réponses</h4><div class="tablewrap"><table><thead><tr><th>Entreprise</th><th>Niche</th><th>Qui gère</th><th>Prestataire</th><th>Depuis</th><th class="n">Frais/mois</th><th class="n">Budget/mois</th><th>Pubs depuis</th><th class="n">Demandes/mois</th><th>Satisfaction</th><th>Fin</th></tr></thead><tbody>' +
+          rows.map(function (l) { var m = mk(l.id); return '<tr class="click" data-id="' + l.id + '"><td>' + esc(l.annonceur) + "</td><td>" + esc(l.niche) + "</td><td>" + esc(PRESTA_L[m.presta] || "—") + "</td><td>" + esc(m.nom || "—") + "</td><td>" + esc(DUREE_L[m.prestaDepuis] || "—") + '</td><td class="n">' + eur(fraisOf(m)) + '</td><td class="n">' + eur(budgetMois(m)) + "</td><td>" + esc(DUREE_L[m.pubsDepuis] || "—") + '</td><td class="n">' + (filled(m.demandes) ? m.demandes : "—") + "</td><td>" + esc(SATIS_L[m.satis] || "—") + "</td><td>" + (m.fin ? esc(fmtD(m.fin)) : "—") + "</td></tr>"; }).join("") +
         "</tbody></table></div>"
       : '<div class="empty-list" style="padding:8px 0">Rien pour l\'instant : remplis le bloc « Étude de marché » des fiches pendant tes appels.</div>') +
     "</div>";
@@ -656,9 +673,9 @@ h4.mkh { font-size: 12px; font-weight: 600; color: var(--muted); margin: 16px 0 
       '<div class="sheet-sec"><div class="lbl">Résultat de l\'appel</div><div class="outcomes">' +
         STATUTS.map(function (s, i) { return '<button class="oc s-' + s.k + '" data-s="' + s.k + '" aria-pressed="' + (rr.statut === s.k) + '"' + dis + ">" + ICONS[s.k] + "<span>" + s.label + "</span><kbd>" + (i + 1) + "</kbd></button>"; }).join("") +
       '</div><div class="callback" id="callbackRow"' + (rr.statut === "rappeler" ? "" : " hidden") + '><label for="rappelLe">Rappeler le</label><input class="field" type="datetime-local" id="rappelLe" value="' + esc(rr.rappelLe || "") + '"' + dis + "></div>" +
+        mkSection(l.id, dis) +
         (l.dirigeant ? "" : '<div style="margin-top:14px"><label class="lbl" for="gerant">Nom du gérant</label><input class="field" id="gerant" placeholder="Prénom et nom, noté pendant l\'appel" value="' + esc(rr.gerant || "") + '"' + dis + "></div>") +
         '<div style="margin-top:14px"><label class="lbl" for="note">Notes</label><textarea class="field" id="note" placeholder="Nb de demandes par mois, délai de rappel actuel, objection, qui décide…"' + dis + ">" + esc(rr.note || "") + '</textarea><div class="savestate" id="savestate"></div></div>' +
-        mkSection(l.id, dis) +
         '<ul class="hist" id="histList">' + histHtml(l.id) + "</ul>" +
       "</div>" +
       '<div class="sheet-sec nav"><button class="btn" id="prev">← Précédente</button><span class="hint">Raccourcis : 1 à 5 pour le résultat, ← → pour changer de fiche</span><button class="btn primary" id="next">Suivante →</button></div>';
