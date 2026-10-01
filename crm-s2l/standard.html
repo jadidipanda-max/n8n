@@ -229,6 +229,37 @@ tr.click:hover td { background: var(--surface-2); }
 @media (prefers-reduced-motion: no-preference) {
   .meter > span, .hb .fill { transition: width 0.3s ease; }
 }
+/* Site et pixel */
+.kv { display: grid; grid-template-columns: minmax(110px, 170px) minmax(0, 1fr); gap: 6px 14px; font-size: 14px; margin: 0; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.kv a { color: var(--accent); }
+.muted { color: var(--muted); font-size: 12.5px; }
+.yes { color: var(--st-int); font-weight: 600; }
+.no { color: var(--st-non); font-weight: 600; }
+.pxbox { margin-top: 14px; border-radius: 10px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface-2); }
+.pxbox.bad { border-color: var(--st-non); background: var(--st-non-soft); }
+.pxbox.good { border-color: var(--st-int); background: var(--st-int-soft); }
+.pxbox .t { font-weight: 600; font-size: 14.5px; }
+.pxbox .say { margin-top: 6px; font-size: 15px; line-height: 1.5; max-width: 75ch; }
+.pxbox .pxnote { margin-top: 6px; font-size: 12.5px; color: var(--muted); }
+
+/* Étude de marché */
+.mkbox { margin-top: 16px; padding: 14px; border: 1px dashed var(--line); border-radius: 10px; }
+.mkrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
+.mkl { font-size: 13.5px; color: var(--muted); min-width: 150px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.sg { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 11px; font-size: 13px; cursor: pointer; color: var(--muted); font-family: inherit; }
+.sg[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.sg:disabled { opacity: 0.5; cursor: not-allowed; }
+.mk { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 12px; }
+.mk label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 3px; }
+.mk .inl { display: flex; gap: 6px; }
+.mk .inl .field { min-width: 0; }
+.mk .inl select.field { width: auto; flex: none; }
+.mkkpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.mkkpis .kpi .v { font-size: 22px; }
+h4.mkh { font-size: 12px; font-weight: 600; color: var(--muted); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: 0.05em; }
 </style>
 
 <header class="topbar">
@@ -272,6 +303,12 @@ tr.click:hover td { background: var(--surface-2); }
   var LABEL = {}; STATUTS.forEach(function (s) { LABEL[s.k] = s.label; });
   var JOINT = { interesse: 1, rdv: 1, pas_interesse: 1, rappeler: 1 };
   var OBJECTIF_JOUR = 100;
+
+  var PRESTA = [["personne", "Personne"], ["seul", "Lui-même"], ["freelance", "Freelance"], ["agence", "Agence"], ["plateforme", "Plateforme / réseau"], ["presta", "Quelqu'un (type ?)"]];
+  var SATIS = [["oui", "Satisfait"], ["moyen", "Mitigé"], ["non", "Pas satisfait"]];
+  var PRESTA_L = {}; PRESTA.forEach(function (p) { PRESTA_L[p[0]] = p[1]; });
+  var SATIS_L = {}; SATIS.forEach(function (p) { SATIS_L[p[0]] = p[1]; });
+  var MK_HEAD = ["Qui gère ses pubs", "Prestataire", "Frais de gestion €/mois", "Budget pub €/mois", "Demandes/mois", "Satisfaction", "Fin d'engagement"];
   var MS_JOUR = 86400000;
 
   // ---------- État ----------
@@ -279,7 +316,7 @@ tr.click:hover td { background: var(--surface-2); }
   var leads = [];          // triées par ordre
   var byId = {};
   var res = {};            // id -> résultat
-  var loaded = { leads: false, res: false };
+  var loaded = { leads: false, res: false, enrich: false };
   var ui = load("ui", { tab: "appel", filtre: "todo", niche: "", q: "", cur: null });
   var chains = {};
   var noteTimer = null;
@@ -395,6 +432,119 @@ tr.click:hover td { background: var(--surface-2); }
     setSave("…");
     gerantTimer = setTimeout(function () { write(id); renderRail(); }, 700);
   }
+  // ---------- Site, pixel et priorité (collection « enrich ») ----------
+  var enrich = {};
+  var PX_HEAD = ["Priorité", "Site", "Pixel Meta", "Pubs envoient vers", "Agence / outil détecté"];
+  var PX_L = { oui: "Oui", non: "Pas trouvé", a_verifier: "À vérifier", pas_de_site: "Pas de site trouvé" };
+  function applyEnrich() {
+    leads.forEach(function (l) { var e = enrich[l.id]; if (e) Object.assign(l, e); });
+    leads.sort(function (a, b) { return a.ordre - b.ordre; });
+  }
+  function pxCols(l) { return [l.prioLabel || "", l.site || "", PX_L[l.pixel] || "", l.destination || "", l.prestaDetecte || ""]; }
+  function siteBox(l) {
+    if (!l.pixel) return "";
+    var rows = [];
+    rows.push(["Son site", l.site ? '<a href="' + esc(l.site) + '" target="_blank" rel="noopener">' + esc(l.siteDomaine || l.site) + "</a>" : "<b>Pas de site trouvé</b>"]);
+    if (l.site) rows.push(["Pixel Meta", l.pixel === "oui" ? '<span class="yes">Oui</span>' + (l.pixelDetail ? ' <span class="muted">· ' + esc(l.pixelDetail) + "</span>" : "") : l.pixel === "non" ? '<span class="no">Pas trouvé</span>' : "À vérifier : le site n'a pas répondu"]);
+    if (l.site && l.gads != null) rows.push(["Google Ads", l.gads ? "Balise trouvée" : "Pas de balise"]);
+    if (l.destination) rows.push(["Ses pubs envoient vers", esc(l.destination) + (l.landing ? ' <span class="muted">· ' + esc(l.landing) + "</span>" : "")]);
+    if (l.prestaDetecte) rows.push(["Agence / outil détecté", esc(l.prestaDetecte)]);
+    if (l.resa) rows.push(["Réservation en ligne", esc(l.resa)]);
+    if (l.plateforme || l.credit) rows.push(["Site fait avec", esc([l.plateforme, l.credit ? "réalisé par " + l.credit : ""].filter(Boolean).join(" · "))]);
+    var cls = l.douleurNiveau === "fort" ? " bad" : l.douleurNiveau === "ok" ? " good" : "";
+    return '<div class="sheet-sec"><div class="lbl">Son site et ses pubs</div><dl class="kv">' + rows.map(function (x) { return "<dt>" + x[0] + "</dt><dd>" + x[1] + "</dd>"; }).join("") + "</dl>" +
+      (l.douleurTitre ? '<div class="pxbox' + cls + '"><div class="t">' + esc(l.douleurTitre) + "</div>" + (l.douleur ? '<div class="say">« ' + esc(l.douleur) + " »</div>" : "") + (l.douleurNote ? '<div class="pxnote">' + esc(l.douleurNote) + "</div>" : "") + "</div>" : "") +
+      "</div>";
+  }
+  function pixelPanel() {
+    var G = [["non", "Site sans pixel Meta"], ["oui", "Pixel Meta trouvé"], ["pas_de_site", "Pas de site trouvé"], ["a_verifier", "Site à vérifier"]];
+    var g = {}; G.forEach(function (x) { g[x[0]] = { n: 0, app: 0, joints: 0, chauds: 0 }; });
+    var dest = {}, tot = 0;
+    leads.forEach(function (l) {
+      var o = g[l.pixel]; if (!o) return;
+      tot++; o.n++;
+      var h = hist(l.id), st = r(l.id).statut;
+      if (h.length) { o.app++; if (h.some(function (e) { return JOINT[e.s]; })) o.joints++; if (st === "interesse" || st === "rdv" || st === "rappeler") o.chauds++; }
+      if (l.destination) dest[l.destination] = (dest[l.destination] || 0) + 1;
+    });
+    if (!tot) return "";
+    return '<div class="panel"><h3>Pixel Meta et sites</h3><div class="sub">Vérifié automatiquement sur leurs sites · « chauds » = intéressés, RDV démo et à rappeler</div><div class="tablewrap"><table><thead><tr><th>Groupe</th><th class="n">Leads</th><th class="n">Appelées</th><th class="n">Jointes</th><th class="n">Chauds</th><th class="n">Chauds / joints</th></tr></thead><tbody>' +
+      G.map(function (x) { var o = g[x[0]]; return "<tr><td>" + esc(x[1]) + '</td><td class="n">' + o.n + '</td><td class="n">' + o.app + '</td><td class="n">' + o.joints + '</td><td class="n">' + o.chauds + '</td><td class="n">' + pct(o.chauds, o.joints) + "</td></tr>"; }).join("") +
+      "</tbody></table></div>" +
+      '<div class="legend" style="margin-top:10px"><span>Leurs pubs envoient vers :</span>' + Object.keys(dest).sort(function (a, b) { return dest[b] - dest[a]; }).map(function (k) { return "<span>" + esc(k) + " <b>" + dest[k] + "</b></span>"; }).join("") + "</div></div>";
+  }
+  // ---------- Étude de marché ----------
+  function mk(id) { return (res[id] && res[id].marche) || {}; }
+  function filled(v) { return v !== "" && v != null; }
+  function budgetMois(m) { if (!filled(m.budget)) return null; return m.unite === "mois" ? +m.budget : Math.round(+m.budget * 30); }
+  function hasMk(m) { return Object.keys(m).some(function (k) { return k !== "unite" && filled(m[k]); }); }
+  function mkCols(rr) { var m = rr.marche || {}, b = budgetMois(m); return [PRESTA_L[m.presta] || "", m.nom || "", filled(m.frais) ? m.frais : "", b != null ? b : "", filled(m.demandes) ? m.demandes : "", SATIS_L[m.satis] || "", m.fin ? fmtD(m.fin) : ""]; }
+  function numOrEmpty(v) { v = String(v || "").replace(",", ".").trim(); if (v === "") return ""; var n = parseFloat(v); return isNaN(n) ? "" : n; }
+  function median(a) { if (!a.length) return null; a = a.slice().sort(function (x, y) { return x - y; }); var k = Math.floor(a.length / 2); return a.length % 2 ? a[k] : Math.round((a[k - 1] + a[k]) / 2); }
+  var mkTimer = null;
+  function setMarche(id, changes, immediate) {
+    if (!canWrite) return;
+    var cur = JSON.parse(JSON.stringify(r(id)));
+    var m = cur.marche || {};
+    Object.keys(changes).forEach(function (k) { if (filled(changes[k])) m[k] = changes[k]; else delete m[k]; });
+    cur.marche = m; cur.maj = new Date().toISOString();
+    res[id] = cur;
+    clearTimeout(mkTimer); setSave("…");
+    if (immediate) { write(id); renderMk(); renderCrmIfVisible(); }
+    else mkTimer = setTimeout(function () { write(id); renderCrmIfVisible(); }, 700);
+  }
+  function segHtml(key, opts, val, dis) {
+    return '<div class="seg" data-mk="' + key + '">' + opts.map(function (o) { return '<button type="button" class="sg" data-v="' + o[0] + '" aria-pressed="' + (val === o[0]) + '"' + dis + ">" + esc(o[1]) + "</button>"; }).join("") + "</div>";
+  }
+  function mkInner(id, dis) {
+    var m = mk(id);
+    var f = function (key, lab, type, val, ph) { return '<div><label for="mk_' + key + '">' + esc(lab) + '</label><input class="field" id="mk_' + key + '" type="' + type + '"' + (type === "number" ? ' min="0" inputmode="decimal"' : "") + ' value="' + esc(filled(val) ? val : "") + '" placeholder="' + esc(ph) + '"' + dis + "></div>"; };
+    return '<div class="lbl">Étude de marché · ce qu\'il a aujourd\'hui</div>' +
+      '<div class="mkrow"><span class="mkl">Qui gère ses pubs ?</span>' + segHtml("presta", PRESTA, m.presta, dis) + "</div>" +
+      '<div class="mk">' +
+        f("nom", "Nom du prestataire", "text", m.nom, "Agence, freelance…") +
+        f("frais", "Frais de gestion (€/mois)", "number", m.frais, "500") +
+        '<div><label for="mk_budget">Budget pub</label><div class="inl"><input class="field" id="mk_budget" type="number" min="0" inputmode="decimal" value="' + esc(filled(m.budget) ? m.budget : "") + '" placeholder="50"' + dis + '><select class="field" id="mk_unite" aria-label="Unité du budget"' + dis + '><option value="jour"' + (m.unite !== "mois" ? " selected" : "") + '>€/jour</option><option value="mois"' + (m.unite === "mois" ? " selected" : "") + ">€/mois</option></select></div></div>" +
+        f("demandes", "Demandes reçues / mois", "number", m.demandes, "30") +
+        f("fin", "Fin d'engagement", "date", m.fin, "") +
+      "</div>" +
+      '<div class="mkrow"><span class="mkl">Content de ses résultats ?</span>' + segHtml("satis", SATIS, m.satis, dis) + "</div>";
+  }
+  function mkSection(id, dis) { return '<div class="mkbox" id="mkbox">' + mkInner(id, dis) + "</div>"; }
+  function renderMk() { var b = $("mkbox"), c = current(); if (b && c) b.innerHTML = mkInner(c.id, canWrite ? "" : " disabled"); }
+  function marketPanel() {
+    var rows = leads.filter(function (l) { return hasMk(mk(l.id)); });
+    var fr = [], bu = [], sat = { oui: 0, moyen: 0, non: 0 }, nSat = 0, byP = {};
+    rows.forEach(function (l) {
+      var m = mk(l.id), b = budgetMois(m);
+      if (filled(m.frais)) fr.push(+m.frais);
+      if (b != null) bu.push(b);
+      if (m.satis) { sat[m.satis]++; nSat++; }
+      var p = m.presta || "?", g = byP[p] || (byP[p] = { n: 0, fr: [], bu: [], oui: 0, moyen: 0, non: 0 });
+      g.n++; if (filled(m.frais)) g.fr.push(+m.frais); if (b != null) g.bu.push(b); if (m.satis) g[m.satis]++;
+    });
+    var eur = function (v) { return v == null ? "—" : v.toLocaleString("fr-FR") + " €"; };
+    var rng = function (a) { return a.length ? "de " + eur(Math.min.apply(null, a)) + " à " + eur(Math.max.apply(null, a)) + " · " + a.length + " réponse" + (a.length > 1 ? "s" : "") : "pas encore de réponse"; };
+    var fins = rows.filter(function (l) { return mk(l.id).fin; }).sort(function (a, b) { return String(mk(a.id).fin).localeCompare(String(mk(b.id).fin)); });
+    var order = PRESTA.map(function (p) { return p[0]; }).concat(["?"]);
+    var fraisOf = function (m) { return filled(m.frais) ? +m.frais : null; };
+    return '<div class="panel"><h3>Étude de marché</h3><div class="sub">Ce que tes prospects paient aujourd\'hui et ce qu\'ils en pensent · rempli depuis les fiches · clique une ligne pour ouvrir la fiche</div>' +
+      (rows.length ?
+        '<div class="mkkpis">' + kpi("Fiches renseignées", rows.length, "sur " + leads.length + " leads") +
+          kpi("Frais de gestion médians", eur(median(fr)) + (fr.length ? "/mois" : ""), rng(fr)) +
+          kpi("Budget pub médian", eur(median(bu)) + (bu.length ? "/mois" : ""), rng(bu)) +
+          kpi("Pas satisfaits", sat.non + (nSat ? " / " + nSat : ""), nSat ? sat.moyen + " mitigés · " + sat.oui + " satisfaits" : "pas encore de réponse") + "</div>" +
+        '<div class="tablewrap"><table><thead><tr><th>Qui gère ses pubs</th><th class="n">Leads</th><th class="n">Frais médians</th><th class="n">Budget médian</th><th class="n">Satisfaits</th><th class="n">Mitigés</th><th class="n">Pas satisfaits</th></tr></thead><tbody>' +
+          order.filter(function (k) { return byP[k]; }).map(function (k) { var g = byP[k]; return "<tr><td>" + esc(PRESTA_L[k] || "Non renseigné") + '</td><td class="n">' + g.n + '</td><td class="n">' + eur(median(g.fr)) + '</td><td class="n">' + eur(median(g.bu)) + '</td><td class="n">' + g.oui + '</td><td class="n">' + g.moyen + '</td><td class="n">' + g.non + "</td></tr>"; }).join("") +
+        "</tbody></table></div>" +
+        (fins.length ? '<h4 class="mkh">Fins d\'engagement : rappelle juste avant</h4><div class="tablewrap"><table><thead><tr><th>Fin</th><th>Entreprise</th><th>Prestataire</th><th class="n">Frais</th><th>Statut</th></tr></thead><tbody>' +
+          fins.map(function (l) { var m = mk(l.id); return '<tr class="click" data-id="' + l.id + '"><td>' + esc(fmtD(m.fin)) + "</td><td>" + esc(l.annonceur) + "</td><td>" + esc([PRESTA_L[m.presta], m.nom].filter(Boolean).join(" · ") || "—") + '</td><td class="n">' + eur(fraisOf(m)) + "</td><td>" + pill(r(l.id).statut) + "</td></tr>"; }).join("") + "</tbody></table></div>" : "") +
+        '<h4 class="mkh">Toutes les réponses</h4><div class="tablewrap"><table><thead><tr><th>Entreprise</th><th>Niche</th><th>Qui gère</th><th>Prestataire</th><th class="n">Frais/mois</th><th class="n">Budget/mois</th><th class="n">Demandes/mois</th><th>Satisfaction</th><th>Fin</th></tr></thead><tbody>' +
+          rows.map(function (l) { var m = mk(l.id); return '<tr class="click" data-id="' + l.id + '"><td>' + esc(l.annonceur) + "</td><td>" + esc(l.niche) + "</td><td>" + esc(PRESTA_L[m.presta] || "—") + "</td><td>" + esc(m.nom || "—") + '</td><td class="n">' + eur(fraisOf(m)) + '</td><td class="n">' + eur(budgetMois(m)) + '</td><td class="n">' + (filled(m.demandes) ? m.demandes : "—") + "</td><td>" + esc(SATIS_L[m.satis] || "—") + "</td><td>" + (m.fin ? esc(fmtD(m.fin)) : "—") + "</td></tr>"; }).join("") +
+        "</tbody></table></div>"
+      : '<div class="empty-list" style="padding:8px 0">Rien pour l\'instant : remplis le bloc « Étude de marché » des fiches pendant tes appels.</div>') +
+    "</div>";
+  }
   function setRappel(id, v) {
     var cur = JSON.parse(JSON.stringify(r(id)));
     cur.rappelLe = v; cur.maj = new Date().toISOString();
@@ -417,10 +567,10 @@ tr.click:hover td { background: var(--surface-2); }
   function renderAppel(full) {
     var root = $("view-appel");
     if (!db) { root.innerHTML = stateBox(dbTried ? "Connexion aux données impossible" : "Chargement des leads…", dbTried ? "Ouvre cette page sur claude.ai en étant connecté : les leads et tes résultats d'appel y sont enregistrés." : "Les fiches des gérants à appeler vont s'afficher ici."); return; }
-    if (!loaded.leads) { root.innerHTML = stateBox("Chargement des leads…", "Les fiches des gérants à appeler vont s'afficher ici."); return; }
+    if (!loaded.leads || !loaded.enrich) { root.innerHTML = stateBox("Chargement des leads…", "Les fiches des gérants à appeler vont s'afficher ici."); return; }
     if (!leads.length) { root.innerHTML = stateBox("Aucune lead pour l'instant", "Les leads sont ajoutées par Claude. Elles apparaîtront ici, classées de la plus qualifiée à la moins qualifiée."); return; }
 
-    var focusNote = document.activeElement && /^(note|gerant|rappelLe)$/.test(document.activeElement.id);
+    var focusNote = document.activeElement && /^(note|gerant|rappelLe|mk_[a-z]+)$/.test(document.activeElement.id);
     if (!full && focusNote) { renderRail(); renderSheetStatus(); return; }
     if (!$("rail")) {
       root.innerHTML = '<div class="desk"><aside class="rail" id="rail"></aside><article class="sheet" id="sheet"></article></div>';
@@ -445,7 +595,7 @@ tr.click:hover td { background: var(--surface-2); }
       '</select><input class="field" id="q" type="search" placeholder="Nom, ville, numéro…" value="' + esc(ui.q) + '" aria-label="Rechercher"></div></div>' +
       '<div class="list" id="list">' + (v.length ? v.map(function (l) {
         var rr = r(l.id), nm = nomGerant(l);
-        return '<button class="item" data-id="' + l.id + '" aria-current="' + (cur && cur.id === l.id) + '"><span class="rk">' + l.ordre + '</span><span class="nm">' + esc(nm || l.annonceur) + '</span><span class="sc" title="Score">' + l.score + '</span><span class="sub">' + (nm ? esc(l.annonceur) : '<i>Gérant à identifier</i>') + " · " + esc(l.ville || shortDept(l.dept)) + "</span>" + pill(rr.statut) + "</button>";
+        return '<button class="item" data-id="' + l.id + '" aria-current="' + (cur && cur.id === l.id) + '"><span class="rk">' + l.ordre + '</span><span class="nm">' + esc(nm || l.annonceur) + '</span><span class="sc" title="Score">' + l.score + '</span><span class="sub">' + (nm ? esc(l.annonceur) : '<i>Gérant à identifier</i>') + " · " + esc(l.ville || shortDept(l.dept)) + (l.pixel === "non" ? " · sans pixel" : l.pixel === "pas_de_site" ? " · sans site" : "") + "</span>" + pill(rr.statut) + "</button>";
       }).join("") : '<div class="empty-list">' + (ui.filtre === "todo" && !ui.q && !ui.niche ? "Toutes les leads ont été appelées. Passe sur « À rappeler » puis « Pas de réponse »." : "Aucune lead dans ce filtre.") + "</div>") + "</div>";
     $("list").scrollTop = listScroll;
     if (qFocus) { var qi = $("q"); qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); }
@@ -476,6 +626,7 @@ tr.click:hover td { background: var(--surface-2); }
     var why = (l.pourquoi || "").split(" · ").filter(function (s) { return !/^dirigeant identifié/i.test(s); });
     var srcCoord = /pubs/i.test(l.source || "") ? "ses pubs Facebook" : /site|mentions/i.test(l.source || "") ? "son site internet" : "sa fiche Google";
     var links = [];
+    if (l.site) links.push('<a class="btn" href="' + esc(l.site) + '" target="_blank" rel="noopener">Son site</a>');
     if (l.urlPage) links.push('<a class="btn" href="' + esc(l.urlPage) + '" target="_blank" rel="noopener">Page Facebook</a>');
     if (l.urlPubs) links.push('<a class="btn" href="' + esc(l.urlPubs) + '" target="_blank" rel="noopener">Ses pubs</a>');
     if (l.urlGoogle) links.push('<a class="btn" href="' + esc(l.urlGoogle) + '" target="_blank" rel="noopener">' + (l.labelGoogle === "Fiche Google" ? "Fiche Google" : "Recherche Google") + "</a>");
@@ -484,7 +635,7 @@ tr.click:hover td { background: var(--surface-2); }
 
     sheet.innerHTML =
       '<div class="sheet-sec">' +
-        '<div class="meta"><span class="rank">N° ' + l.ordre + ' / ' + leads.length + '</span><span>Score <span class="score">' + l.score + '</span></span><span class="tag">' + esc(l.niche) + '</span><span>' + esc(l.dept || "") + '</span>' + (l.idf === "Oui" ? '<span class="tag">Île-de-France · démo sur place</span>' : "") + (l.dirigeant ? "" : '<span class="tag">Sans nom de gérant</span>') + pill(rr.statut) + "</div>" +
+        '<div class="meta"><span class="rank">N° ' + l.ordre + ' / ' + leads.length + '</span>' + (l.prioLabel ? '<span class="tag">' + esc(l.prioLabel) + '</span>' : '') + '<span>Score <span class="score">' + l.score + '</span></span><span class="tag">' + esc(l.niche) + '</span><span>' + esc(l.dept || "") + '</span>' + (l.idf === "Oui" ? '<span class="tag">Île-de-France · démo sur place</span>' : "") + (l.dirigeant ? "" : '<span class="tag">Sans nom de gérant</span>') + pill(rr.statut) + "</div>" +
         '<div class="who"><div style="min-width:0">' + (nm ? '<h1>' + esc(nm) + '</h1><div class="role">' + esc(!l.dirigeant ? "Nom noté pendant l'appel" : metaNom ? "Titulaire des pubs (nom déclaré à Meta)" : (l.qualite || "")) + '</div><div class="biz">' + esc(l.annonceur) : '<h1>' + esc(l.annonceur) + '</h1><div class="role">Gérant à identifier : demande-le dès le début de l\'appel</div><div class="biz">' + esc(l.niche)) + (l.entreprise && l.entreprise.toLowerCase().indexOf(l.annonceur.toLowerCase()) < 0 ? " <span>· " + esc(l.entreprise) + "</span>" : "") + (l.ville ? " <span>· " + esc(l.ville) + "</span>" : "") + "</div></div>" +
           '<div class="phone"><div class="digits" id="digits">' + esc(l.tel) + '</div><div class="acts"><a class="btn primary" href="tel:' + esc(l.tel.replace(/\s/g, "")) + '">' + ICONS.phone + 'Appeler</a><button class="btn" id="copyTel">' + ICONS.copy + '<span>Copier</span></button></div><div class="src">' + esc(l.source || "") + (l.fiabilite ? " · rapprochement " + esc(String(l.fiabilite).toLowerCase()) : "") + "</div>" + (l.telFixe ? '<div class="src">Standard : <span class="num" style="font-family:var(--font-mono)">' + esc(l.telFixe) + "</span></div>" : "") + "</div></div>" +
         (aConf ? '<div class="warn">Numéro à confirmer : commence par « Je suis bien chez ' + esc(l.annonceur) + " ? »</div>" : "") +
@@ -501,11 +652,13 @@ tr.click:hover td { background: var(--surface-2); }
         fact(fmtD(l.dernierePub), "dernière pub" + (j != null ? " (il y a " + j + " j)" : "")) +
         fact(l.whatsapp === "Oui" ? "Oui" : "Non", "WhatsApp / Messenger") +
       '</div><div class="links">' + links.join("") + "</div></div>" +
+      siteBox(l) +
       '<div class="sheet-sec"><div class="lbl">Résultat de l\'appel</div><div class="outcomes">' +
         STATUTS.map(function (s, i) { return '<button class="oc s-' + s.k + '" data-s="' + s.k + '" aria-pressed="' + (rr.statut === s.k) + '"' + dis + ">" + ICONS[s.k] + "<span>" + s.label + "</span><kbd>" + (i + 1) + "</kbd></button>"; }).join("") +
       '</div><div class="callback" id="callbackRow"' + (rr.statut === "rappeler" ? "" : " hidden") + '><label for="rappelLe">Rappeler le</label><input class="field" type="datetime-local" id="rappelLe" value="' + esc(rr.rappelLe || "") + '"' + dis + "></div>" +
         (l.dirigeant ? "" : '<div style="margin-top:14px"><label class="lbl" for="gerant">Nom du gérant</label><input class="field" id="gerant" placeholder="Prénom et nom, noté pendant l\'appel" value="' + esc(rr.gerant || "") + '"' + dis + "></div>") +
         '<div style="margin-top:14px"><label class="lbl" for="note">Notes</label><textarea class="field" id="note" placeholder="Nb de demandes par mois, délai de rappel actuel, objection, qui décide…"' + dis + ">" + esc(rr.note || "") + '</textarea><div class="savestate" id="savestate"></div></div>' +
+        mkSection(l.id, dis) +
         '<ul class="hist" id="histList">' + histHtml(l.id) + "</ul>" +
       "</div>" +
       '<div class="sheet-sec nav"><button class="btn" id="prev">← Précédente</button><span class="hint">Raccourcis : 1 à 5 pour le résultat, ← → pour changer de fiche</span><button class="btn primary" id="next">Suivante →</button></div>';
@@ -537,7 +690,7 @@ tr.click:hover td { background: var(--surface-2); }
 
   function renderCrm() {
     var root = $("view-crm");
-    if (!db || !loaded.leads) { root.innerHTML = stateBox("Chargement…", "Les chiffres de tes appels vont s'afficher ici."); return; }
+    if (!db || !loaded.leads || !loaded.enrich) { root.innerHTML = stateBox("Chargement…", "Les chiffres de tes appels vont s'afficher ici."); return; }
     var s = stats();
     var relance = leads.filter(function (l) { var st = r(l.id).statut; return st === "interesse" || st === "rdv" || st === "rappeler"; })
       .sort(function (a, b) { var o = { rdv: 0, interesse: 1, rappeler: 2 }; return (o[r(a.id).statut] - o[r(b.id).statut]) || String(r(a.id).rappelLe || "9").localeCompare(String(r(b.id).rappelLe || "9")); });
@@ -559,6 +712,8 @@ tr.click:hover td { background: var(--surface-2); }
       '<div class="panel"><h3>Par niche</h3><div class="sub">Quelle niche répond et signe le mieux</div><div class="tablewrap"><table><thead><tr><th>Niche</th><th class="n">Leads</th><th class="n">Appelées</th><th class="n">Jointes</th><th class="n">Taux de réponse</th><th class="n">Intéressés</th><th class="n">RDV démo</th><th class="n">RDV / joints</th></tr></thead><tbody>' +
         Object.keys(s.parNiche).sort().map(function (k) { var n = s.parNiche[k]; return "<tr><td>" + esc(k) + '</td><td class="n">' + n.leads + '</td><td class="n">' + n.appelees + '</td><td class="n">' + n.joints + '</td><td class="n">' + pct(n.joints, n.appelees) + '</td><td class="n">' + n.chauds + '</td><td class="n">' + n.rdv + '</td><td class="n">' + pct(n.rdv, n.joints) + "</td></tr>"; }).join("") +
       "</tbody></table></div></div>" +
+      pixelPanel() +
+      marketPanel() +
       '<div class="panel"><div class="panel-head"><div><h3>À suivre</h3><div class="sub">RDV démo, intéressés et rappels prévus · clique une ligne pour ouvrir la fiche</div></div><button class="btn" id="copyCsv">' + ICONS.copy + '<span>Copier tout pour Excel</span></button></div>' +
         (relance.length ? '<div class="tablewrap"><table><thead><tr><th>Statut</th><th>Gérant</th><th>Entreprise</th><th>Téléphone</th><th>Rappeler le</th><th>Notes</th></tr></thead><tbody>' +
           relance.map(function (l) { var rr = r(l.id); return '<tr class="click" data-id="' + l.id + '"><td>' + pill(rr.statut) + "</td><td>" + esc(nomGerant(l) || "—") + "</td><td>" + esc(l.annonceur) + '</td><td class="num" style="font-family:var(--font-mono)">' + esc(l.tel) + "</td><td>" + (rr.rappelLe ? esc(fmtDT(rr.rappelLe)) : "—") + '</td><td class="note">' + esc(rr.note || "") + "</td></tr>"; }).join("") +
@@ -614,10 +769,10 @@ tr.click:hover td { background: var(--surface-2); }
     return '<path class="' + cls + '" d="M' + x + " " + yBase + "V" + (yTop + rr) + "Q" + x + " " + yTop + " " + (x + rr) + " " + yTop + "H" + (x + w - rr) + "Q" + (x + w) + " " + yTop + " " + (x + w) + " " + (yTop + rr) + "V" + yBase + 'Z"/>';
   }
   function csv() {
-    var head = ["N°", "Score", "Niche", "Annonceur", "Gérant", "Téléphone", "Ville", "Statut", "Rappeler le", "Nb d'appels", "Dernier appel", "Notes"];
+    var head = ["N°", "Score", "Niche", "Annonceur", "Gérant", "Téléphone", "Ville", "Statut", "Rappeler le", "Nb d'appels", "Dernier appel", "Notes"].concat(PX_HEAD, MK_HEAD);
     var rows = leads.map(function (l) {
       var rr = r(l.id), h = hist(l.id), last = h[h.length - 1];
-      return [l.ordre, l.score, l.niche, l.annonceur, nomGerant(l), l.tel, l.ville || "", rr.statut ? LABEL[rr.statut] : "À appeler", rr.rappelLe ? fmtDT(rr.rappelLe) : "", h.length, last ? fmtDT(last.t) : "", (rr.note || "").replace(/\s+/g, " ")];
+      return [l.ordre, l.score, l.niche, l.annonceur, nomGerant(l), l.tel, l.ville || "", rr.statut ? LABEL[rr.statut] : "À appeler", rr.rappelLe ? fmtDT(rr.rappelLe) : "", h.length, last ? fmtDT(last.t) : "", (rr.note || "").replace(/\s+/g, " ")].concat(pxCols(l), mkCols(rr));
     });
     return [head].concat(rows).map(function (row) { return row.map(function (c) { return String(c).replace(/\t/g, " "); }).join("\t"); }).join("\n");
   }
@@ -642,16 +797,19 @@ tr.click:hover td { background: var(--surface-2); }
     if (t.id === "prev") return step(-1);
     if (t.id === "copyTel") { var c2 = current(); copy(c2 ? c2.tel : "", t, $("digits")); return; }
     if (t.id === "copyCsv") { copy(csv(), t, null); return; }
+    if (t.classList.contains("sg")) { var cm = current(); if (cm) { var ch = {}; ch[t.parentNode.dataset.mk] = t.getAttribute("aria-pressed") === "true" ? "" : t.dataset.v; setMarche(cm.id, ch, true); } return; }
     if (t.matches("tr.click")) { ui.cur = t.dataset.id; ui.filtre = "all"; save("ui", ui); switchTab("appel"); return; }
   });
   document.addEventListener("input", function (e) {
     if (e.target.id === "q") { ui.q = e.target.value; save("ui", ui); renderRail(); }
     if (e.target.id === "note") { var c = current(); if (c) setNote(c.id, e.target.value); }
     if (e.target.id === "gerant") { var g = current(); if (g) setGerant(g.id, e.target.value); }
+    if (/^mk_(nom|frais|budget|demandes)$/.test(e.target.id)) { var cm = current(); if (cm) { var key = e.target.id.slice(3), ch = {}; ch[key] = key === "nom" ? e.target.value.trim() : numOrEmpty(e.target.value); if (key === "budget") ch.unite = ($("mk_unite") || {}).value || "jour"; setMarche(cm.id, ch, false); } }
   });
   document.addEventListener("change", function (e) {
     if (e.target.id === "niche") { ui.niche = e.target.value; save("ui", ui); renderAppel(true); }
     if (e.target.id === "rappelLe") { var c = current(); if (c) setRappel(c.id, e.target.value); }
+    if (e.target.id === "mk_unite" || e.target.id === "mk_fin") { var cm2 = current(); if (cm2) { var ch2 = {}; ch2[e.target.id.slice(3)] = e.target.value; setMarche(cm2.id, ch2, true); } }
   });
   document.addEventListener("keydown", function (e) {
     if (ui.tab !== "appel" || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -683,15 +841,23 @@ tr.click:hover td { background: var(--surface-2); }
     renderAll();
     db.collection("leads").limit(1000).onSnapshot(function (snap) {
       leads = snap.docs.map(function (d) { var x = Object.assign({}, d.data()); x.id = d.id; return x; }).sort(function (a, b) { return a.ordre - b.ordre; });
+      applyEnrich();
       byId = {}; leads.forEach(function (l) { byId[l.id] = l; });
       loaded.leads = true;
       if (ui.cur && !byId[ui.cur]) ui.cur = null;
       renderAll();
     }, function (e) { showBanner("Les leads ne se chargent plus (" + e.code + "). Recharge la page."); });
+    db.collection("enrich").limit(20).onSnapshot(function (snap) {
+      enrich = {};
+      snap.docs.forEach(function (d) { var it = (d.data() || {}).items || {}; Object.keys(it).forEach(function (k) { enrich[k] = it[k]; }); });
+      loaded.enrich = true;
+      if (loaded.leads) { applyEnrich(); byId = {}; leads.forEach(function (l) { byId[l.id] = l; }); }
+      renderAll();
+    }, function () { loaded.enrich = true; renderAll(); });
     db.collection("resultats").limit(1000).onSnapshot(function (snap) {
-      var editing = document.activeElement && /^(note|gerant)$/.test(document.activeElement.id) ? ui.cur : null;
+      var editing = document.activeElement && /^(note|gerant|mk_[a-z]+)$/.test(document.activeElement.id) ? ui.cur : null;
       snap.docs.forEach(function (d) {
-        if (d.id === editing && res[d.id]) { res[d.id] = Object.assign({}, d.data(), { note: res[d.id].note, gerant: res[d.id].gerant }); }
+        if (d.id === editing && res[d.id]) { res[d.id] = Object.assign({}, d.data(), { note: res[d.id].note, gerant: res[d.id].gerant, marche: res[d.id].marche }); }
         else res[d.id] = Object.assign({}, d.data());
       });
       snap.docChanges().forEach(function (ch) { if (ch.type === "removed") delete res[ch.doc.id]; });
