@@ -1,0 +1,741 @@
+<title>Standard Acquisition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Mise en page : standard téléphonique, version acquisition. Un seul univers assumé : noir profond et mauve. */
+:root {
+  color-scheme: dark;
+  --bg: #0b0810;
+  --surface: #141019;
+  --surface-2: #1c1624;
+  --fg: #f3eef9;
+  --muted: #a898bd;
+  --faint: #76688b;
+  --line: #2b2138;
+  --accent: #b98cf2;
+  --accent-soft: #2a1d3c;
+  --on-accent: #150a22;
+  --st-int: #62d394;  --st-int-soft: #15301f;
+  --st-rdv: #93b6ff;  --st-rdv-soft: #1a2645;
+  --st-non: #f2808f;  --st-non-soft: #3a1820;
+  --st-nr:  #aaa1b8;  --st-nr-soft:  #241f2c;
+  --st-rap: #f3b85e;  --st-rap-soft: #382912;
+  --warn-soft: #382912;
+  --font-display: "Syne", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 10px;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--fg); }
+body { font-family: var(--font-body); font-size: 15px; line-height: 1.5; margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Barre du haut */
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.topbar-in { max-width: 1400px; margin: 0 auto; padding: 10px 16px; display: flex; gap: 12px 20px; align-items: center; flex-wrap: wrap; }
+.brand { font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: -0.01em; display: flex; align-items: baseline; gap: 8px; }
+.brand small { font-family: var(--font-body); font-weight: 500; font-size: 12px; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.tabs { display: flex; gap: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.tab { border: 0; background: transparent; padding: 6px 14px; border-radius: 999px; cursor: pointer; font-weight: 500; color: var(--muted); }
+.tab[aria-selected="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.today { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.meter { width: 120px; height: 8px; border-radius: 999px; background: var(--accent-soft); overflow: hidden; }
+.meter > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.today b { color: var(--fg); font-family: var(--font-mono); font-weight: 600; }
+
+.wrap { max-width: 1400px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 40px; }
+.banner { background: var(--warn-soft); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 14px; font-size: 14px; }
+
+/* Écran d'appel */
+.desk { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.rail { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; max-height: calc(100vh - 110px); position: sticky; top: calc(env(safe-area-inset-top, 0px) + 72px); min-width: 0; }
+.rail-head { padding: 12px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--line); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 10px; font-size: 13px; cursor: pointer; color: var(--muted); }
+.chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--fg); font-weight: 500; }
+.chip .n { font-family: var(--font-mono); font-size: 12px; margin-left: 4px; }
+.row2 { display: flex; gap: 6px; }
+.row2 > * { flex: 1; min-width: 0; }
+.field { border: 1px solid var(--line); background: var(--surface-2); border-radius: 8px; padding: 6px 10px; font-size: 14px; width: 100%; }
+.list { overflow-y: auto; flex: 1; min-height: 0; }
+.item { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 2px 8px; padding: 9px 12px; border-bottom: 1px solid var(--line); cursor: pointer; background: transparent; border-left: 3px solid transparent; width: 100%; text-align: left; border-top: 0; border-right: 0; }
+.item:hover { background: var(--surface-2); }
+.item[aria-current="true"] { background: var(--accent-soft); border-left-color: var(--accent); }
+.item .rk { font-family: var(--font-mono); font-size: 12px; color: var(--faint); grid-row: span 2; padding-top: 2px; }
+.item .nm { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item .sub { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; grid-column: 2; }
+.item .sc { font-family: var(--font-mono); font-size: 12px; color: var(--muted); text-align: right; }
+.item .pill { grid-column: 3; justify-self: end; }
+.empty-list { padding: 24px 16px; color: var(--muted); font-size: 14px; }
+
+.pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.pill svg { width: 12px; height: 12px; }
+.s-interesse { color: var(--st-int); background: var(--st-int-soft); }
+.s-rdv { color: var(--st-rdv); background: var(--st-rdv-soft); }
+.s-pas_interesse { color: var(--st-non); background: var(--st-non-soft); }
+.s-no_rep { color: var(--st-nr); background: var(--st-nr-soft); }
+.s-rappeler { color: var(--st-rap); background: var(--st-rap-soft); }
+.s-none { color: var(--faint); background: var(--surface-2); }
+
+.sheet { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
+.sheet-sec { padding: 18px 22px; border-bottom: 1px solid var(--line); }
+.sheet-sec:last-child { border-bottom: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); align-items: center; }
+.meta .rank { font-family: var(--font-mono); color: var(--fg); font-weight: 600; }
+.score { font-family: var(--font-mono); font-weight: 600; color: var(--accent); }
+.tag { font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); }
+.who { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 24px; align-items: end; margin-top: 12px; }
+.who h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(26px, 4vw, 38px); line-height: 1.1; margin: 0; letter-spacing: -0.015em; text-wrap: balance; }
+.who .role { color: var(--muted); font-size: 14px; margin-top: 4px; }
+.who .biz { font-size: 16px; font-weight: 600; margin-top: 8px; }
+.who .biz span { font-weight: 400; color: var(--muted); font-size: 14px; }
+.phone { text-align: right; }
+.phone .digits { font-family: var(--font-mono); font-weight: 600; font-size: clamp(24px, 3.4vw, 32px); letter-spacing: 0.02em; user-select: all; white-space: nowrap; }
+.phone .acts { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-size: 14px; font-weight: 500; text-decoration: none; color: var(--fg); display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn svg { width: 16px; height: 16px; }
+.phone .src { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.warn { background: var(--warn-soft); border-radius: 8px; padding: 8px 12px; font-size: 13.5px; margin-top: 12px; }
+
+.script { display: grid; gap: 12px; }
+.lbl { font-size: 11.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--faint); margin-bottom: 4px; }
+.ask { font-size: 16px; }
+.ask b { font-weight: 600; }
+.hook { font-size: 16px; line-height: 1.55; max-width: 70ch; border-left: 3px solid var(--accent); padding-left: 12px; }
+.why { display: flex; flex-wrap: wrap; gap: 6px; }
+.why span { font-size: 13px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; }
+.legal { font-size: 13px; color: var(--muted); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+.fact .v { font-family: var(--font-mono); font-weight: 600; font-size: 18px; }
+.fact .k { font-size: 12.5px; color: var(--muted); }
+.links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+.outcomes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.oc { border: 1.5px solid var(--line); background: var(--surface); border-radius: 10px; padding: 12px 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; }
+.oc svg { width: 22px; height: 22px; }
+.oc kbd { font-family: var(--font-mono); font-size: 11px; color: var(--faint); font-weight: 500; }
+.oc.s-interesse, .oc.s-rdv, .oc.s-pas_interesse, .oc.s-no_rep, .oc.s-rappeler { background: var(--surface); }
+.oc.s-interesse { color: var(--st-int); } .oc.s-rdv { color: var(--st-rdv); } .oc.s-pas_interesse { color: var(--st-non); } .oc.s-no_rep { color: var(--st-nr); } .oc.s-rappeler { color: var(--st-rap); }
+.oc[aria-pressed="true"].s-interesse { background: var(--st-int-soft); border-color: var(--st-int); }
+.oc[aria-pressed="true"].s-rdv { background: var(--st-rdv-soft); border-color: var(--st-rdv); }
+.oc[aria-pressed="true"].s-pas_interesse { background: var(--st-non-soft); border-color: var(--st-non); }
+.oc[aria-pressed="true"].s-no_rep { background: var(--st-nr-soft); border-color: var(--st-nr); }
+.oc[aria-pressed="true"].s-rappeler { background: var(--st-rap-soft); border-color: var(--st-rap); }
+.oc:disabled { opacity: 0.5; cursor: not-allowed; }
+.callback { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; font-size: 14px; }
+.callback .field { width: auto; }
+textarea.field { min-height: 96px; resize: vertical; line-height: 1.5; margin-top: 4px; }
+.savestate { font-size: 12.5px; color: var(--muted); min-height: 18px; margin-top: 4px; }
+.hist { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.hist .t { font-family: var(--font-mono); font-size: 12px; margin-right: 8px; }
+.nav { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
+.nav .hint { font-size: 12.5px; color: var(--faint); }
+.xlsnote { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 13.5px; margin-top: 12px; }
+
+.situ { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.situ-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+.situ-card .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.situ-card .v { font-size: 20px; font-weight: 600; margin-top: 2px; }
+.situ-card .v small { font-size: 13px; font-weight: 400; color: var(--muted); }
+.reasons { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
+.sb { display: inline-block; font-size: 12.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; }
+.sb-absent, .sb-a_refaire { background: var(--st-rap-soft); color: var(--st-rap); }
+.sb-moyen, .sb-a_verifier { background: var(--accent-soft); color: var(--accent); }
+.sb-correct { background: var(--st-int-soft); color: var(--st-int); }
+.tag.hot { border-color: var(--accent); color: var(--accent); }
+.qs { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 15px; }
+.its { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.it { border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); border-radius: 999px; padding: 6px 12px; font-size: 13.5px; cursor: pointer; }
+.it[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); font-weight: 600; }
+.it:disabled { opacity: 0.5; cursor: not-allowed; }
+.deliver { font-size: 14px; color: var(--muted); }
+.deliver b { color: var(--fg); font-weight: 600; }
+.state { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 40px 24px; text-align: center; color: var(--muted); }
+.state h2 { font-family: var(--font-display); color: var(--fg); margin: 0 0 6px; font-size: 22px; }
+
+/* CRM */
+.crm { display: grid; gap: 16px; }
+.kpis { display: grid; grid-template-columns: minmax(220px, 1.2fr) repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; min-width: 0; }
+.kpi .k { font-size: 13px; color: var(--muted); }
+.kpi .v { font-family: var(--font-body); font-weight: 600; font-size: 28px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.kpi .d { font-size: 12.5px; color: var(--muted); }
+.kpi.hero .v { font-size: 52px; }
+.panels { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; }
+.panel h3 { font-family: var(--font-display); font-size: 17px; margin: 0 0 2px; font-weight: 600; }
+.panel .sub { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .axis { fill: var(--muted); font-size: 11px; font-family: var(--font-body); }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .bar { fill: var(--accent); }
+.chart .goal { stroke: var(--muted); stroke-width: 1; }
+.chart .goal-t { fill: var(--muted); font-size: 11px; font-family: var(--font-body); }
+.chart .hit { fill: transparent; }
+
+.tip { position: absolute; pointer-events: none; background: var(--fg); color: var(--bg); font-size: 12.5px; padding: 6px 9px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -110%); }
+.legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--muted); margin-top: 8px; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.hbars { display: grid; gap: 10px; }
+.hb { display: grid; grid-template-columns: 130px minmax(0, 1fr) 44px; gap: 10px; align-items: center; font-size: 14px; }
+.hb .track { height: 14px; background: var(--surface-2); border-radius: 0 4px 4px 0; }
+.hb .fill { height: 100%; border-radius: 0 4px 4px 0; min-width: 2px; }
+.hb .c { font-family: var(--font-mono); text-align: right; }
+.hb .lab { display: flex; align-items: center; gap: 6px; }
+.hb .lab svg { width: 14px; height: 14px; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+td.note { white-space: normal; min-width: 220px; max-width: 420px; color: var(--muted); }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--surface-2); }
+.panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+
+@media (max-width: 980px) {
+  .panels { grid-template-columns: minmax(0, 1fr); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi.hero { grid-column: span 2; }
+}
+@media (max-width: 860px) {
+  .desk { grid-template-columns: minmax(0, 1fr); }
+  .rail { position: static; max-height: 70vh; order: 2; }
+  .sheet { order: 1; }
+  .who { grid-template-columns: minmax(0, 1fr); }
+  .phone { text-align: left; }
+  .phone .acts { justify-content: flex-start; }
+  .outcomes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .oc:last-child { grid-column: span 2; }
+  .oc kbd { display: none; }
+  .nav .hint { display: none; }
+  .today .meter { width: 70px; }
+  .sheet-sec { padding: 16px; }
+  .hb { grid-template-columns: 110px minmax(0, 1fr) 36px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .meter > span, .hb .fill { transition: width 0.3s ease; }
+}
+</style>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brand">J-Square <small>Acquisition</small></div>
+    <div class="tabs" role="tablist">
+      <button class="tab" id="tab-appel" role="tab" aria-selected="true">Écran d'appel</button>
+      <button class="tab" id="tab-crm" role="tab" aria-selected="false">CRM</button>
+    </div>
+    <div class="today">Aujourd'hui <b class="num" id="todayCount">0</b>/ 100 appels <div class="meter" aria-hidden="true"><span id="todayMeter" style="width:0%"></span></div></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="banner" id="banner" hidden></div>
+  <section id="view-appel"></section>
+  <section id="view-crm" hidden></section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Constantes ----------
+  var ICONS = {
+    interesse: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    rdv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M9 15l2 2 4-4"/></svg>',
+    pas_interesse: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>',
+    no_rep: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/><path d="M15 3l6 6M21 3l-6 6"/></svg>',
+    rappeler: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+    phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2"/></svg>',
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/></svg>'
+  };
+  var STATUTS = [
+    { k: "interesse", label: "Intéressé" },
+    { k: "rdv", label: "RDV démo" },
+    { k: "pas_interesse", label: "Pas intéressé" },
+    { k: "no_rep", label: "Pas de réponse" },
+    { k: "rappeler", label: "À rappeler" }
+  ];
+  var LABEL = {}; STATUTS.forEach(function (s) { LABEL[s.k] = s.label; });
+  var JOINT = { interesse: 1, rdv: 1, pas_interesse: 1, rappeler: 1 };
+  var OBJECTIF_JOUR = 100;
+  var SITE_LBL = { absent: "Pas de vrai site", a_refaire: "Site à refaire", moyen: "Site à améliorer", a_verifier: "Site à vérifier", correct: "Site correct" };
+  var INTERETS = [{ k: "pubs", label: "Publicités" }, { k: "site", label: "Site internet" }, { k: "reseaux", label: "Réseaux sociaux" }, { k: "seo", label: "Référencement Google" }, { k: "tri", label: "Tri des demandes" }];
+  var ZONES = { "93": "Seine-Saint-Denis", "IDF": "Île-de-France (hors 93)", "FR": "Reste de la France" };
+  var LIVRE = {
+    "Agences immobilières": "projet de vente, raison de vendre, délai, prix envisagé, ce qui compte pour lui avec un pro",
+    "Centres esthétiques": "soin recherché, zone à traiter, budget, disponibilités",
+    "Cuisinistes": "neuf ou rénovation, budget, délai, pièce déjà mesurée ou non",
+    "Traiteurs / lieux de réception": "type d'événement, date, nombre d'invités, budget"
+  };
+  var MS_JOUR = 86400000;
+
+  // ---------- État ----------
+  var db = null, canWrite = true;
+  var leads = [];          // triées par ordre
+  var byId = {};
+  var res = {};            // id -> résultat
+  var loaded = { leads: false, res: false };
+  var ui = load("ui", { tab: "appel", filtre: "todo", niche: "", zone: "", q: "", cur: null });
+  var chains = {};
+  var noteTimer = null;
+
+  function load(k, d) { try { var v = localStorage.getItem("sa-" + k); return v ? Object.assign({}, d, JSON.parse(v)) : d; } catch (e) { return d; } }
+  function save(k, v) { try { localStorage.setItem("sa-" + k, JSON.stringify(v)); } catch (e) {} }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function $(id) { return document.getElementById(id); }
+  function dayKey(d) { d = new Date(d); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  function fmtDT(iso) { var d = new Date(iso); return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); }
+  function fmtD(iso) { if (!iso) return "—"; var d = new Date(iso + (iso.length === 10 ? "T00:00:00" : "")); return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }); }
+  function joursDepuis(iso) { if (!iso) return null; return Math.max(0, Math.round((Date.now() - new Date(iso + "T00:00:00").getTime()) / MS_JOUR)); }
+  function r(id) { return res[id] || { statut: null, note: "", rappelLe: "", historique: [] }; }
+  function hist(id) { return (res[id] && res[id].historique) || []; }
+  function nomGerant(l) { return l.dirigeant || (res[l.id] && res[l.id].gerant) || ""; }
+  function pill(st) { if (!st) return '<span class="pill s-none">À appeler</span>'; return '<span class="pill s-' + st + '">' + ICONS[st] + esc(LABEL[st]) + "</span>"; }
+
+  // ---------- Filtres ----------
+  function inFiltre(l, f) {
+    var s = r(l.id).statut;
+    if (f === "todo") return !s;
+    if (f === "rappel") return s === "rappeler" || s === "no_rep";
+    if (f === "chaud") return s === "interesse" || s === "rdv";
+    if (f === "non") return s === "pas_interesse";
+    return true;
+  }
+  function visible() {
+    var q = ui.q.trim().toLowerCase();
+    var list = leads.filter(function (l) {
+      if (!inFiltre(l, ui.filtre)) return false;
+      if (ui.niche && l.niche !== ui.niche) return false;
+      if (ui.zone && l.zone !== ui.zone) return false;
+      if (q) { var h = [l.annonceur, nomGerant(l), l.ville, l.tel, l.entreprise].filter(Boolean).join(" ").toLowerCase(); if (h.indexOf(q) < 0 && h.replace(/\s/g, "").indexOf(q.replace(/\s/g, "")) < 0) return false; }
+      return true;
+    });
+    if (ui.filtre === "rappel") {
+      list.sort(function (a, b) {
+        var ra = r(a.id), rb = r(b.id);
+        var pa = ra.statut === "rappeler" ? 0 : 1, pb = rb.statut === "rappeler" ? 0 : 1;
+        if (pa !== pb) return pa - pb;
+        if (pa === 0) return String(ra.rappelLe || "9").localeCompare(String(rb.rappelLe || "9"));
+        return (hist(a.id).length - hist(b.id).length) || (a.ordre - b.ordre);
+      });
+    }
+    return list;
+  }
+  function counts() {
+    var c = { todo: 0, rappel: 0, chaud: 0, non: 0, all: leads.length };
+    leads.forEach(function (l) { ["todo", "rappel", "chaud", "non"].forEach(function (f) { if (inFiltre(l, f)) c[f]++; }); });
+    return c;
+  }
+  function current() {
+    if (ui.cur && byId[ui.cur]) return byId[ui.cur];
+    var v = visible(); return v[0] || leads[0] || null;
+  }
+  function step(dir) {
+    var cur = current(); if (!cur) return;
+    var v = visible();
+    var i = v.findIndex(function (l) { return l.id === cur.id; });
+    var nxt;
+    if (i >= 0) nxt = v[i + dir];
+    else if (ui.filtre === "rappel") nxt = v[dir > 0 ? 0 : v.length - 1];
+    else nxt = dir > 0 ? v.find(function (l) { return l.ordre > cur.ordre; }) : v.slice().reverse().find(function (l) { return l.ordre < cur.ordre; });
+    if (!nxt) nxt = v.find(function (l) { return l.id !== cur.id; });
+    if (nxt) { ui.cur = nxt.id; save("ui", ui); renderAppel(true); window.scrollTo({ top: 0 }); }
+  }
+
+  // ---------- Écriture ----------
+  function write(id) {
+    if (!db || !canWrite) return Promise.resolve();
+    var body = JSON.parse(JSON.stringify(res[id]));
+    setSave("Enregistrement…");
+    chains[id] = (chains[id] || Promise.resolve()).then(function () {
+      return db.collection("resultats").doc(id).set(body);
+    }).then(function () {
+      setSave("Enregistré à " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
+    }, function (e) {
+      if (e && e.code === "invalid_argument") { canWrite = false; showBanner("Tu peux consulter cette page mais pas l'enregistrer : seul le propriétaire du lien peut noter les appels."); }
+      else if (e && e.code === "unavailable") { return new Promise(function (ok) { setTimeout(ok, 800 + Math.random() * 800); }).then(function () { return db.collection("resultats").doc(id).set(body); }).then(function () { setSave("Enregistré"); }, function () { setSave("Pas enregistré : vérifie ta connexion puis reclique."); }); }
+      else setSave("Pas enregistré (" + esc(e && e.code || "erreur") + "). Reclique sur le résultat.");
+    });
+    return chains[id];
+  }
+  function setSave(t) { var el = $("savestate"); if (el) el.textContent = t; }
+  function showBanner(t) { var b = $("banner"); b.textContent = t; b.hidden = false; }
+
+  function setStatut(id, st) {
+    if (!canWrite) return;
+    var cur = JSON.parse(JSON.stringify(r(id)));
+    var now = new Date().toISOString();
+    var h = cur.historique || [];
+    var last = h[h.length - 1];
+    // Correction d'un mauvais clic : dans les 3 minutes, on remplace le dernier résultat au lieu d'ajouter un appel.
+    if (last && Date.now() - new Date(last.t).getTime() < 3 * 60000) last.s = st; else h.push({ s: st, t: now });
+    if (h.length > 40) h = h.slice(-40);
+    cur.historique = h; cur.statut = st; cur.maj = now;
+    if (st !== "rappeler") cur.rappelLe = cur.rappelLe || "";
+    res[id] = cur;
+    write(id);
+    renderAll();
+  }
+  function setNote(id, txt) {
+    var cur = JSON.parse(JSON.stringify(r(id)));
+    cur.note = txt; cur.maj = new Date().toISOString();
+    res[id] = cur;
+    clearTimeout(noteTimer);
+    setSave("…");
+    noteTimer = setTimeout(function () { write(id); renderCrmIfVisible(); }, 700);
+  }
+  function toggleInteret(id, k) {
+    if (!canWrite) return;
+    var cur = JSON.parse(JSON.stringify(r(id)));
+    var a = cur.interets || [];
+    var i = a.indexOf(k); if (i >= 0) a.splice(i, 1); else a.push(k);
+    cur.interets = a; cur.maj = new Date().toISOString();
+    res[id] = cur; write(id);
+    document.querySelectorAll(".it").forEach(function (b) { b.setAttribute("aria-pressed", String(a.indexOf(b.dataset.it) >= 0)); });
+  }
+  var gerantTimer = null;
+  function setGerant(id, txt) {
+    var cur = JSON.parse(JSON.stringify(r(id)));
+    cur.gerant = txt.trim(); cur.maj = new Date().toISOString();
+    res[id] = cur;
+    clearTimeout(gerantTimer);
+    setSave("…");
+    gerantTimer = setTimeout(function () { write(id); renderRail(); }, 700);
+  }
+  function setRappel(id, v) {
+    var cur = JSON.parse(JSON.stringify(r(id)));
+    cur.rappelLe = v; cur.maj = new Date().toISOString();
+    res[id] = cur; write(id);
+  }
+
+  // ---------- Rendu : écran d'appel ----------
+  function renderAll() { renderToday(); if (ui.tab === "appel") renderAppel(false); else renderCrm(); }
+  function renderCrmIfVisible() { if (ui.tab === "crm") renderCrm(); }
+
+  function renderToday() {
+    var t = dayKey(Date.now()), n = 0;
+    Object.keys(res).forEach(function (id) { hist(id).forEach(function (e) { if (dayKey(e.t) === t) n++; }); });
+    $("todayCount").textContent = n;
+    $("todayMeter").style.width = Math.min(100, n / OBJECTIF_JOUR * 100) + "%";
+  }
+
+  function stateBox(title, text) { return '<div class="state"><h2>' + esc(title) + "</h2><p>" + esc(text) + "</p></div>"; }
+
+  function renderAppel(full) {
+    var root = $("view-appel");
+    if (!db) { root.innerHTML = stateBox(dbTried ? "Connexion aux données impossible" : "Chargement des leads…", dbTried ? "Ouvre cette page sur claude.ai en étant connecté : les leads et tes résultats d'appel y sont enregistrés." : "Les fiches des gérants à appeler vont s'afficher ici."); return; }
+    if (!loaded.leads) { root.innerHTML = stateBox("Chargement des leads…", "Les fiches des gérants à appeler vont s'afficher ici."); return; }
+    if (!leads.length) { root.innerHTML = stateBox("Aucune lead pour l'instant", "Les commerces sans pub sont ajoutés par Claude. Ils apparaîtront ici, classés du plus prometteur au moins prometteur."); return; }
+
+    var focusNote = document.activeElement && /^(note|gerant|rappelLe)$/.test(document.activeElement.id);
+    if (!full && focusNote) { renderRail(); renderSheetStatus(); return; }
+    if (!$("rail")) {
+      root.innerHTML = '<div class="desk"><aside class="rail" id="rail"></aside><article class="sheet" id="sheet"></article></div>';
+    }
+    renderRail();
+    renderSheet();
+  }
+
+  function renderRail() {
+    var c = counts();
+    var niches = Array.from(new Set(leads.map(function (l) { return l.niche; }))).sort();
+    var v = visible(), cur = current();
+    var chips = [["todo", "À appeler"], ["rappel", "À rappeler"], ["chaud", "Intéressés"], ["non", "Pas intéressés"], ["all", "Toutes"]];
+    var rail = $("rail");
+    var listScroll = $("list") ? $("list").scrollTop : 0;
+    var qFocus = document.activeElement && document.activeElement.id === "q";
+    rail.innerHTML =
+      '<div class="rail-head"><div class="chips">' + chips.map(function (ch) {
+        return '<button class="chip" data-f="' + ch[0] + '" aria-pressed="' + (ui.filtre === ch[0]) + '">' + ch[1] + '<span class="n">' + c[ch[0]] + "</span></button>";
+      }).join("") + '</div><div class="row2"><select class="field" id="niche" aria-label="Niche"><option value="">Toutes les niches</option>' +
+      niches.map(function (n) { return '<option' + (ui.niche === n ? " selected" : "") + ">" + esc(n) + "</option>"; }).join("") +
+      '</select><select class="field" id="zone" aria-label="Zone"><option value="">Toutes les zones</option>' +
+      Object.keys(ZONES).map(function (z) { return '<option value="' + z + '"' + (ui.zone === z ? " selected" : "") + ">" + esc(ZONES[z]) + "</option>"; }).join("") +
+      '</select></div><input class="field" id="q" type="search" placeholder="Nom, ville, numéro…" value="' + esc(ui.q) + '" aria-label="Rechercher"></div>' +
+      '<div class="list" id="list">' + (v.length ? v.map(function (l) {
+        var rr = r(l.id), nm = nomGerant(l);
+        return '<button class="item" data-id="' + l.id + '" aria-current="' + (cur && cur.id === l.id) + '"><span class="rk">' + l.ordre + '</span><span class="nm">' + esc(nm || l.annonceur) + '</span><span class="sc" title="Score">' + l.score + '</span><span class="sub">' + (nm ? esc(l.annonceur) : '<i>Gérant à identifier</i>') + " · " + esc(l.ville || shortDept(l.dept)) + "</span>" + pill(rr.statut) + "</button>";
+      }).join("") : '<div class="empty-list">' + (ui.filtre === "todo" && !ui.q && !ui.niche ? "Toutes les leads ont été appelées. Passe sur « À rappeler »." : "Aucune lead dans ce filtre.") + "</div>") + "</div>";
+    $("list").scrollTop = listScroll;
+    if (qFocus) { var qi = $("q"); qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); }
+  }
+  function shortDept(d) { return d ? String(d).split("–").pop().trim() : ""; }
+
+  function renderSheetStatus() {
+    var cur = current(); if (!cur) return;
+    var st = r(cur.id).statut;
+    document.querySelectorAll(".oc").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.s === st)); });
+    var cb = $("callbackRow"); if (cb) cb.hidden = st !== "rappeler";
+    var hl = $("histList"); if (hl) hl.innerHTML = histHtml(cur.id);
+  }
+  function histHtml(id) {
+    var h = hist(id);
+    if (!h.length) return "";
+    return h.slice().reverse().map(function (e) { return '<li><span class="t">' + fmtDT(e.t) + "</span>" + esc(LABEL[e.s] || e.s) + "</li>"; }).join("");
+  }
+
+  function siteHref(u) { return /^https?:\/\//i.test(u) ? u : "http://" + u; }
+  function renderSheet() {
+    var l = current(); var sheet = $("sheet");
+    if (!l) { sheet.innerHTML = ""; return; }
+    ui.cur = l.id;
+    var rr = r(l.id), nm = nomGerant(l), its = rr.interets || [];
+    var why = (l.pourquoi || "").split(" · ").filter(Boolean);
+    var links = [];
+    if (l.urlMaps) links.push('<a class="btn" href="' + esc(l.urlMaps) + '" target="_blank" rel="noopener">Fiche Google</a>');
+    if (l.site) links.push('<a class="btn" href="' + esc(siteHref(l.site)) + '" target="_blank" rel="noopener">Son site</a>');
+    if (l.urlSiren) links.push('<a class="btn" href="' + esc(l.urlSiren) + '" target="_blank" rel="noopener">Fiche entreprise</a>');
+    links.push('<a class="btn" href="https://www.google.com/search?q=' + encodeURIComponent(l.annonceur + " " + (l.ville || "")) + '" target="_blank" rel="noopener">Recherche Google</a>');
+    var dis = canWrite ? "" : " disabled";
+    var stars = l.noteGoogle ? String(l.noteGoogle).replace(".", ",") + " ★" : "—";
+    var raisons = (l.siteRaisons || []).slice(0, 4);
+    sheet.innerHTML =
+      '<div class="sheet-sec">' +
+        '<div class="meta"><span class="rank">N° ' + l.ordre + ' / ' + leads.length + '</span><span>Score <span class="score">' + l.score + '</span></span><span class="tag">' + esc(l.niche) + '</span><span>' + esc(l.ville || "") + (l.cp ? " (" + esc(String(l.cp).slice(0, 2)) + ")" : "") + '</span>' + (l.zone === "93" ? '<span class="tag hot">Seine-Saint-Denis · démo sur place</span>' : l.zone === "IDF" ? '<span class="tag">Île-de-France</span>' : "") + (l.dirigeant ? "" : '<span class="tag">Sans nom de gérant</span>') + pill(rr.statut) + "</div>" +
+        '<div class="who"><div style="min-width:0">' + (nm ? '<h1>' + esc(nm) + '</h1><div class="role">' + esc(!l.dirigeant ? "Nom noté pendant l'appel" : (l.qualite || "")) + '</div><div class="biz">' + esc(l.annonceur) : '<h1>' + esc(l.annonceur) + '</h1><div class="role">Gérant à identifier : demande-le dès le début de l\'appel</div><div class="biz">' + esc(l.categorie || l.niche)) + (l.ville ? " <span>· " + esc(l.ville) + "</span>" : "") + "</div></div>" +
+          '<div class="phone"><div class="digits" id="digits">' + esc(l.tel) + '</div><div class="acts"><a class="btn primary" href="tel:' + esc(l.tel.replace(/\s/g, "")) + '">' + ICONS.phone + 'Appeler</a><button class="btn" id="copyTel">' + ICONS.copy + '<span>Copier</span></button></div><div class="src">Fiche Google · ' + (l.mobile ? "portable" : "ligne fixe") + (l.entreprise ? " · " + esc(l.entreprise) : "") + "</div></div></div>" +
+      "</div>" +
+      '<div class="sheet-sec"><div class="lbl">Sa situation aujourd\'hui</div><div class="situ">' +
+        '<div class="situ-card"><div class="k">Avis Google</div><div class="v">' + stars + ' <small>' + (l.avis || 0) + ' avis</small></div></div>' +
+        '<div class="situ-card"><div class="k">Site internet</div><div class="v"><span class="sb sb-' + esc(l.siteEtat || "absent") + '">' + esc(SITE_LBL[l.siteEtat] || "Pas de vrai site") + "</span></div>" + (raisons.length ? '<ul class="reasons">' + raisons.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") + "</div>" +
+        '<div class="situ-card"><div class="k">Pubs Facebook / Instagram</div><div class="v">Aucune <small>trouvée dans la bibliothèque Meta</small></div></div>' +
+      '</div><div class="links">' + links.join("") + "</div></div>" +
+      '<div class="sheet-sec script">' +
+        '<div><div class="lbl">Ouverture</div><div class="ask">' + (nm ? "« Bonjour, <b>" + esc(nm) + "</b> ? Jay, de J-Square. »" : "« Bonjour, je suis bien avec le gérant ou la gérante de <b>" + esc(l.annonceur) + "</b> ? Jay, de J-Square. »") + "</div></div>" +
+        '<div><div class="lbl">Accroche</div><div class="hook">' + esc(l.accroche || "") + "</div></div>" +
+        '<div><div class="lbl">Questions à poser</div><ol class="qs"><li>Aujourd\'hui, comment vos nouveaux clients vous trouvent-ils ?</li><li>Combien de nouveaux clients par mois ? Et combien vous en voudriez ?</li><li>Vous avez déjà fait de la pub ? Qui s\'occupe de votre site et de vos réseaux ?</li><li>Si on vous envoie des demandes déjà triées, vous les rappelez dans la journée ?</li></ol></div>' +
+        '<div class="deliver"><b>Ce qu\'on lui livre :</b> des demandes de clients déjà triées dans son CRM (' + esc(LIVRE[l.niche] || "projet, budget, délai") + '), c\'est lui qui rappelle.</div>' +
+        (why.length ? '<div><div class="lbl">Pourquoi c\'est une bonne cible</div><div class="why">' + why.map(function (w) { return "<span>" + esc(w) + "</span>"; }).join("") + "</div></div>" : "") +
+        '<div class="legal">À dire dès le début : ses coordonnées viennent de sa fiche Google et du registre des entreprises ; il peut refuser d\'être rappelé (dans ce cas : « Pas intéressé »).</div>' +
+      "</div>" +
+      '<div class="sheet-sec"><div class="lbl">Résultat de l\'appel</div><div class="outcomes">' +
+        STATUTS.map(function (s, i) { return '<button class="oc s-' + s.k + '" data-s="' + s.k + '" aria-pressed="' + (rr.statut === s.k) + '"' + dis + ">" + ICONS[s.k] + "<span>" + s.label + "</span><kbd>" + (i + 1) + "</kbd></button>"; }).join("") +
+      '</div><div class="callback" id="callbackRow"' + (rr.statut === "rappeler" ? "" : " hidden") + '><label for="rappelLe">Rappeler le</label><input class="field" type="datetime-local" id="rappelLe" value="' + esc(rr.rappelLe || "") + '"' + dis + "></div>" +
+        '<div style="margin-top:14px"><div class="lbl">Ce qui l\'intéresse</div><div class="its">' + INTERETS.map(function (x) { return '<button class="it" data-it="' + x.k + '" aria-pressed="' + (its.indexOf(x.k) >= 0) + '"' + dis + ">" + esc(x.label) + "</button>"; }).join("") + "</div></div>" +
+        (l.dirigeant ? "" : '<div style="margin-top:14px"><label class="lbl" for="gerant">Nom du gérant</label><input class="field" id="gerant" placeholder="Prénom et nom, noté pendant l\'appel" value="' + esc(rr.gerant || "") + '"' + dis + "></div>") +
+        '<div style="margin-top:14px"><label class="lbl" for="note">Notes</label><textarea class="field" id="note" placeholder="Comment il trouve ses clients, nombre de clients par mois, budget pub, objection, qui décide…"' + dis + ">" + esc(rr.note || "") + '</textarea><div class="savestate" id="savestate"></div></div>' +
+        '<ul class="hist" id="histList">' + histHtml(l.id) + "</ul>" +
+      "</div>" +
+      '<div class="sheet-sec nav"><button class="btn" id="prev">← Précédente</button><span class="hint">Raccourcis : 1 à 5 pour le résultat, ← → pour changer de fiche</span><button class="btn primary" id="next">Suivante →</button></div>';
+    save("ui", ui);
+    var it = document.querySelector('.item[aria-current="true"]');
+    if (it && it.scrollIntoView) { var list = $("list"); var top = it.offsetTop - list.offsetTop; if (top < list.scrollTop || top > list.scrollTop + list.clientHeight - 60) list.scrollTop = top - 80; }
+  }
+  function fact(v, k) { return '<div class="fact"><div class="v">' + esc(v) + '</div><div class="k">' + esc(k) + "</div></div>"; }
+
+  // ---------- Rendu : CRM ----------
+  function stats() {
+    var s = { leads: leads.length, appelees: 0, joints: 0, chauds: 0, rdv: 0, non: 0, rappeler: 0, noRep: 0, appels: 0, parStatut: {}, parNiche: {}, parZone: {}, parInteret: {}, avecInteret: 0 };
+    INTERETS.forEach(function (x) { s.parInteret[x.k] = 0; });
+    STATUTS.forEach(function (x) { s.parStatut[x.k] = 0; });
+    leads.forEach(function (l) {
+      var h = hist(l.id), st = r(l.id).statut;
+      var n = s.parNiche[l.niche] || (s.parNiche[l.niche] = { leads: 0, appelees: 0, joints: 0, chauds: 0, rdv: 0 });
+      var zk = ZONES[l.zone] || "Reste de la France";
+      var z = s.parZone[zk] || (s.parZone[zk] = { leads: 0, appelees: 0, joints: 0, chauds: 0, rdv: 0 });
+      n.leads++; z.leads++;
+      var itl = r(l.id).interets || [];
+      if (itl.length) { s.avecInteret++; itl.forEach(function (k) { if (k in s.parInteret) s.parInteret[k]++; }); }
+      if (!h.length) return;
+      s.appels += h.length; s.appelees++; n.appelees++; z.appelees++;
+      var joint = h.some(function (e) { return JOINT[e.s]; });
+      if (joint) { s.joints++; n.joints++; z.joints++; }
+      if (st) s.parStatut[st]++;
+      if (st === "interesse" || st === "rdv") { s.chauds++; n.chauds++; z.chauds++; }
+      if (st === "rdv") { s.rdv++; n.rdv++; z.rdv++; }
+    });
+    return s;
+  }
+  function pct(a, b) { return b ? Math.round(a / b * 100) + " %" : "—"; }
+
+  function renderCrm() {
+    var root = $("view-crm");
+    if (!db || !loaded.leads) { root.innerHTML = stateBox("Chargement…", "Les chiffres de tes appels vont s'afficher ici."); return; }
+    var s = stats();
+    var relance = leads.filter(function (l) { var st = r(l.id).statut; return st === "interesse" || st === "rdv" || st === "rappeler"; })
+      .sort(function (a, b) { var o = { rdv: 0, interesse: 1, rappeler: 2 }; return (o[r(a.id).statut] - o[r(b.id).statut]) || String(r(a.id).rappelLe || "9").localeCompare(String(r(b.id).rappelLe || "9")); });
+
+    root.innerHTML =
+      '<div class="crm">' +
+      '<div class="kpis">' +
+        '<div class="kpi hero"><div class="k">RDV démo pris</div><div class="v">' + s.rdv + '</div><div class="d">' + pct(s.rdv, s.joints) + " des gérants joints</div></div>" +
+        kpi("Leads appelées", s.appelees, "sur " + s.leads + " · " + s.appels + " appels au total") +
+        kpi("Gérants joints", s.joints, "taux de réponse " + pct(s.joints, s.appelees)) +
+        kpi("Intéressés", s.chauds, pct(s.chauds, s.joints) + " des joints (RDV compris)") +
+        kpi("Pas intéressés", s.parStatut.pas_interesse, pct(s.parStatut.pas_interesse, s.joints) + " des joints") +
+        kpi("Reste à appeler", s.leads - s.appelees, "jamais appelées") +
+      "</div>" +
+      '<div class="panels">' +
+        '<div class="panel"><h3>Appels par jour</h3><div class="sub">14 derniers jours · objectif ' + OBJECTIF_JOUR + ' par jour · survole une barre pour le détail</div><div class="chart" id="chart"></div></div>' +
+        '<div class="panel"><h3>Où en sont les leads</h3><div class="sub">Dernier résultat de chaque lead appelée</div><div class="hbars">' + hbars(s) + "</div></div>" +
+      "</div>" +
+      '<div class="panel"><h3>Ce qui les intéresse</h3><div class="sub">Cases cochées pendant les appels · ' + s.avecInteret + ' gérant(s) concerné(s) · pour savoir quelle partie de l\'offre vendre en premier</div><div class="hbars">' + interetBars(s) + "</div></div>" +
+      tableGroup("Par zone", "Où ça répond le mieux", s.parZone) +
+      '<div class="panel"><h3>Par niche</h3><div class="sub">Quelle niche répond et signe le mieux</div><div class="tablewrap"><table><thead><tr><th>Niche</th><th class="n">Leads</th><th class="n">Appelées</th><th class="n">Jointes</th><th class="n">Taux de réponse</th><th class="n">Intéressés</th><th class="n">RDV démo</th><th class="n">RDV / joints</th></tr></thead><tbody>' +
+        Object.keys(s.parNiche).sort().map(function (k) { var n = s.parNiche[k]; return "<tr><td>" + esc(k) + '</td><td class="n">' + n.leads + '</td><td class="n">' + n.appelees + '</td><td class="n">' + n.joints + '</td><td class="n">' + pct(n.joints, n.appelees) + '</td><td class="n">' + n.chauds + '</td><td class="n">' + n.rdv + '</td><td class="n">' + pct(n.rdv, n.joints) + "</td></tr>"; }).join("") +
+      "</tbody></table></div></div>" +
+      '<div class="panel"><div class="panel-head"><div><h3>À suivre</h3><div class="sub">RDV démo, intéressés et rappels prévus · clique une ligne pour ouvrir la fiche</div></div><button class="btn" id="copyCsv">' + ICONS.copy + '<span>Copier tout pour Excel</span></button></div>' +
+        (relance.length ? '<div class="tablewrap"><table><thead><tr><th>Statut</th><th>Gérant</th><th>Entreprise</th><th>Téléphone</th><th>Rappeler le</th><th>Notes</th></tr></thead><tbody>' +
+          relance.map(function (l) { var rr = r(l.id); return '<tr class="click" data-id="' + l.id + '"><td>' + pill(rr.statut) + "</td><td>" + esc(nomGerant(l) || "—") + "</td><td>" + esc(l.annonceur) + '</td><td class="num" style="font-family:var(--font-mono)">' + esc(l.tel) + "</td><td>" + (rr.rappelLe ? esc(fmtDT(rr.rappelLe)) : "—") + '</td><td class="note">' + esc(rr.note || "") + "</td></tr>"; }).join("") +
+          "</tbody></table></div>" : '<div class="empty-list" style="padding:8px 0">Rien pour l\'instant : les gérants intéressés, les RDV et les rappels apparaîtront ici.</div>') +
+      "</div></div>";
+    drawChart();
+  }
+  function interetBars(s) {
+    var max = Math.max(1, Math.max.apply(null, INTERETS.map(function (x) { return s.parInteret[x.k]; })));
+    return INTERETS.map(function (x) { var v = s.parInteret[x.k]; return '<div class="hb"><span class="lab">' + esc(x.label) + '</span><div class="track"><div class="fill" style="width:' + (v / max * 100) + '%;background:var(--accent)"></div></div><span class="c">' + v + "</span></div>"; }).join("");
+  }
+  function tableGroup(title, sub, obj) {
+    return '<div class="panel"><h3>' + esc(title) + '</h3><div class="sub">' + esc(sub) + '</div><div class="tablewrap"><table><thead><tr><th></th><th class="n">Leads</th><th class="n">Appelées</th><th class="n">Jointes</th><th class="n">Taux de réponse</th><th class="n">Intéressés</th><th class="n">RDV démo</th></tr></thead><tbody>' +
+      Object.keys(obj).sort().map(function (k) { var n = obj[k]; return "<tr><td>" + esc(k) + '</td><td class="n">' + n.leads + '</td><td class="n">' + n.appelees + '</td><td class="n">' + n.joints + '</td><td class="n">' + pct(n.joints, n.appelees) + '</td><td class="n">' + n.chauds + '</td><td class="n">' + n.rdv + "</td></tr>"; }).join("") +
+      "</tbody></table></div></div>";
+  }
+  function kpi(k, v, d) { return '<div class="kpi"><div class="k">' + esc(k) + '</div><div class="v">' + v + '</div><div class="d">' + esc(d) + "</div></div>"; }
+  function hbars(s) {
+    var max = Math.max(1, Math.max.apply(null, STATUTS.map(function (x) { return s.parStatut[x.k]; })));
+    var colors = { interesse: "--st-int", rdv: "--st-rdv", pas_interesse: "--st-non", no_rep: "--st-nr", rappeler: "--st-rap" };
+    return STATUTS.map(function (x) {
+      var v = s.parStatut[x.k];
+      return '<div class="hb"><span class="lab"><span class="pill s-' + x.k + '" style="padding:2px 5px">' + ICONS[x.k] + "</span>" + esc(x.label) + '</span><div class="track"><div class="fill" style="width:' + (v / max * 100) + "%;background:var(" + colors[x.k] + ')"></div></div><span class="c">' + v + "</span></div>";
+    }).join("");
+  }
+  function drawChart() {
+    var el = $("chart"); if (!el) return;
+    var days = [], today = new Date(); today.setHours(0, 0, 0, 0);
+    for (var i = 13; i >= 0; i--) { var d = new Date(today.getTime() - i * MS_JOUR); days.push({ k: dayKey(d), d: d, n: 0, j: 0 }); }
+    var idx = {}; days.forEach(function (x, i) { idx[x.k] = i; });
+    Object.keys(res).forEach(function (id) { hist(id).forEach(function (e) { var i = idx[dayKey(e.t)]; if (i != null) { days[i].n++; if (JOINT[e.s]) days[i].j++; } }); });
+    var W = 640, H = 220, L = 34, R = 8, T = 10, B = 26;
+    var top = Math.max(OBJECTIF_JOUR, Math.max.apply(null, days.map(function (x) { return x.n; })));
+    var stepV = top <= 100 ? 25 : top <= 200 ? 50 : 100;
+    top = Math.ceil(top / stepV) * stepV;
+    var y = function (v) { return T + (H - T - B) * (1 - v / top); };
+    var band = (W - L - R) / days.length, bw = Math.min(24, band * 0.6);
+    var g = "";
+    for (var t = 0; t <= top; t += stepV) g += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(t) + '" y2="' + y(t) + '"/><text class="axis" x="' + (L - 6) + '" y="' + (y(t) + 4) + '" text-anchor="end">' + t + "</text>";
+    g += '<line class="goal" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(OBJECTIF_JOUR) + '" y2="' + y(OBJECTIF_JOUR) + '"/><text class="goal-t" x="' + (W - R) + '" y="' + (y(OBJECTIF_JOUR) - 5) + '" text-anchor="end">objectif ' + OBJECTIF_JOUR + '</text>';
+    days.forEach(function (x, i) {
+      var cx = L + band * i + band / 2;
+      g += barPath("bar", cx - bw / 2, bw, y(x.n), y(0));
+      if (i % 2 === 1 || days.length <= 7) g += '<text class="axis" x="' + cx + '" y="' + (H - 8) + '" text-anchor="middle">' + x.d.toLocaleDateString("fr-FR", { day: "numeric", month: "numeric" }) + "</text>";
+      g += '<rect class="hit" data-i="' + i + '" x="' + (L + band * i) + '" y="' + T + '" width="' + band + '" height="' + (H - T - B) + '"/>';
+    });
+    el.innerHTML = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Appels par jour sur 14 jours">' + g + '</svg><div class="tip" id="tip" hidden></div>';
+    var tip = $("tip");
+    el.querySelectorAll(".hit").forEach(function (h) {
+      h.addEventListener("mouseenter", function () {
+        var x = days[+h.dataset.i];
+        tip.innerHTML = esc(x.d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })) + " · <b>" + x.n + "</b> appels · " + x.j + " joints";
+        var box = el.getBoundingClientRect(), hb = h.getBoundingClientRect();
+        tip.style.left = (hb.left - box.left + hb.width / 2) + "px"; tip.style.top = (hb.top - box.top + 20) + "px"; tip.hidden = false;
+      });
+      h.addEventListener("mouseleave", function () { tip.hidden = true; });
+    });
+  }
+  function barPath(cls, x, w, yTop, yBase) {
+    var hgt = yBase - yTop; if (hgt <= 0) return "";
+    var rr = Math.min(4, hgt, w / 2);
+    return '<path class="' + cls + '" d="M' + x + " " + yBase + "V" + (yTop + rr) + "Q" + x + " " + yTop + " " + (x + rr) + " " + yTop + "H" + (x + w - rr) + "Q" + (x + w) + " " + yTop + " " + (x + w) + " " + (yTop + rr) + "V" + yBase + 'Z"/>';
+  }
+  function csv() {
+    var head = ["N°", "Score", "Niche", "Commerce", "Gérant", "Téléphone", "Ville", "Zone", "Note Google", "Avis", "Site", "État du site", "Statut", "Intérêts", "Rappeler le", "Nb d'appels", "Dernier appel", "Notes"];
+    var rows = leads.map(function (l) {
+      var rr = r(l.id), h = hist(l.id), last = h[h.length - 1];
+      var itl = (rr.interets || []).map(function (k) { var f = INTERETS.filter(function (x) { return x.k === k; })[0]; return f ? f.label : k; }).join(", ");
+      return [l.ordre, l.score, l.niche, l.annonceur, nomGerant(l), l.tel, l.ville || "", ZONES[l.zone] || "", l.noteGoogle || "", l.avis || 0, l.site || "", SITE_LBL[l.siteEtat] || "", rr.statut ? LABEL[rr.statut] : "À appeler", itl, rr.rappelLe ? fmtDT(rr.rappelLe) : "", h.length, last ? fmtDT(last.t) : "", (rr.note || "").replace(/\s+/g, " ")];
+    });
+    return [head].concat(rows).map(function (row) { return row.map(function (c) { return String(c).replace(/\t/g, " "); }).join("\t"); }).join("\n");
+  }
+
+  // ---------- Événements ----------
+  function switchTab(t) {
+    ui.tab = t; save("ui", ui);
+    $("tab-appel").setAttribute("aria-selected", String(t === "appel"));
+    $("tab-crm").setAttribute("aria-selected", String(t === "crm"));
+    $("view-appel").hidden = t !== "appel"; $("view-crm").hidden = t !== "crm";
+    if (t === "appel") renderAppel(true); else renderCrm();
+  }
+  $("tab-appel").addEventListener("click", function () { switchTab("appel"); });
+  $("tab-crm").addEventListener("click", function () { switchTab("crm"); });
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button, tr.click"); if (!t) return;
+    if (t.classList.contains("chip")) { ui.filtre = t.dataset.f; ui.cur = null; save("ui", ui); var v = visible(); if (v[0]) ui.cur = v[0].id; renderAppel(true); return; }
+    if (t.classList.contains("item")) { ui.cur = t.dataset.id; save("ui", ui); renderAppel(true); if (window.innerWidth <= 860) window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    if (t.classList.contains("oc")) { var c = current(); if (c) setStatut(c.id, t.dataset.s); return; }
+    if (t.classList.contains("it")) { var ci = current(); if (ci) toggleInteret(ci.id, t.dataset.it); return; }
+    if (t.id === "next") return step(1);
+    if (t.id === "prev") return step(-1);
+    if (t.id === "copyTel") { var c2 = current(); copy(c2 ? c2.tel : "", t, $("digits")); return; }
+    if (t.id === "copyCsv") { copy(csv(), t, null); return; }
+    if (t.matches("tr.click")) { ui.cur = t.dataset.id; ui.filtre = "all"; save("ui", ui); switchTab("appel"); return; }
+  });
+  document.addEventListener("input", function (e) {
+    if (e.target.id === "q") { ui.q = e.target.value; save("ui", ui); renderRail(); }
+    if (e.target.id === "note") { var c = current(); if (c) setNote(c.id, e.target.value); }
+    if (e.target.id === "gerant") { var g = current(); if (g) setGerant(g.id, e.target.value); }
+  });
+  document.addEventListener("change", function (e) {
+    if (e.target.id === "niche") { ui.niche = e.target.value; save("ui", ui); renderAppel(true); }
+    if (e.target.id === "zone") { ui.zone = e.target.value; save("ui", ui); renderAppel(true); }
+    if (e.target.id === "rappelLe") { var c = current(); if (c) setRappel(c.id, e.target.value); }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (ui.tab !== "appel" || e.metaKey || e.ctrlKey || e.altKey) return;
+    var tag = (document.activeElement && document.activeElement.tagName) || "";
+    if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
+    var c = current(); if (!c) return;
+    if (/^[1-5]$/.test(e.key)) { setStatut(c.id, STATUTS[+e.key - 1].k); e.preventDefault(); }
+    else if (e.key === "ArrowRight") { step(1); e.preventDefault(); }
+    else if (e.key === "ArrowLeft") { step(-1); e.preventDefault(); }
+  });
+  function copy(txt, btn, sel) {
+    var lab = btn.querySelector("span"); var old = lab ? lab.textContent : "";
+    var done = function (m) { if (lab) { lab.textContent = m; setTimeout(function () { lab.textContent = old; }, 1600); } };
+    try {
+      navigator.clipboard.writeText(txt).then(function () { done("Copié"); }, function () { selectEl(sel); done(sel ? "Sélectionné" : "Copie refusée"); });
+    } catch (err) { selectEl(sel); done(sel ? "Sélectionné" : "Copie refusée"); }
+  }
+  function selectEl(el) { if (!el) return; var rg = document.createRange(); rg.selectNodeContents(el); var s = window.getSelection(); s.removeAllRanges(); s.addRange(rg); }
+
+  // ---------- Données ----------
+  var dbTried = false;
+  switchTab(ui.tab === "crm" ? "crm" : "appel");
+  renderToday();
+
+  Promise.all([window.claude && window.claude.use ? window.claude.use("db") : Promise.resolve(null), window.claude && window.claude.use ? window.claude.use("user") : Promise.resolve(null)]).then(function (arr) {
+    dbTried = true; db = arr[0]; var user = arr[1];
+    if (!db) { renderAll(); return; }
+    if (user) user.can("data.write").then(function (v) { if (v === false) { canWrite = false; showBanner("Lecture seule : seul le propriétaire du lien peut noter les appels."); renderAll(); } }, function () {});
+    renderAll();
+    db.collection("lots").limit(200).onSnapshot(function (snap) {
+      leads = [];
+      snap.docs.forEach(function (d) { ((d.data() || {}).leads || []).forEach(function (x) { leads.push(Object.assign({}, x)); }); });
+      leads.sort(function (a, b) { return a.ordre - b.ordre; });
+      byId = {}; leads.forEach(function (l) { byId[l.id] = l; });
+      loaded.leads = true;
+      if (ui.cur && !byId[ui.cur]) ui.cur = null;
+      renderAll();
+    }, function (e) { showBanner("Les leads ne se chargent plus (" + e.code + "). Recharge la page."); });
+    db.collection("resultats").limit(1000).onSnapshot(function (snap) {
+      var editing = document.activeElement && /^(note|gerant)$/.test(document.activeElement.id) ? ui.cur : null;
+      snap.docs.forEach(function (d) {
+        if (d.id === editing && res[d.id]) { res[d.id] = Object.assign({}, d.data(), { note: res[d.id].note, gerant: res[d.id].gerant }); }
+        else res[d.id] = Object.assign({}, d.data());
+      });
+      snap.docChanges().forEach(function (ch) { if (ch.type === "removed") delete res[ch.doc.id]; });
+      loaded.res = true;
+      renderAll();
+    }, function (e) { showBanner("Les résultats ne se chargent plus (" + e.code + "). Recharge la page."); });
+  });
+})();
+</script>
