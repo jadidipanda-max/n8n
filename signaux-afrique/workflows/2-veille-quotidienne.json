@@ -1,0 +1,401 @@
+{
+  "name": "Radar 2 : veille quotidienne (appels d'offres et actualités)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Radar 2 : veille quotidienne\nChaque matin à 7 h, ce workflow récupère :\n- les **appels d'offres** de la Banque mondiale en Afrique (fournitures agricoles, semences, vivres…), avec **l'acheteur et son contact** ;\n- les **actualités** Google sur les pénuries, interdictions d'export, importations et exportations agricoles.\n\nIl ne garde que ce qui parle de tes produits, ignore ce qu'il a déjà vu, range tout dans l'onglet **Signaux** et t'envoie un email s'il y a du nouveau.\n\n**À faire une fois :** remplis le nœud **Paramètres**, choisis ton compte Google dans les nœuds Google Sheets et Gmail, puis active le workflow. (La mémoire « déjà vu » ne fonctionne que quand le workflow est activé, pas pendant les tests.)",
+        "height": 320,
+        "width": 600
+      },
+      "id": "0b6a4b96-3a95-5fdc-aa5f-927f83fa5a77",
+      "name": "Mode d’emploi",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -380
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "8af03e79-fc43-5869-906b-fe0188d3b6cd",
+      "name": "Lancer à la main",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "d8f45fb7-e464-522a-808c-9e8f3f89e3d3",
+      "name": "Chaque matin à 7 h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================================\n//  PARAMÈTRES DE LA VEILLE QUOTIDIENNE : c'est le seul nœud à modifier.\n// =====================================================================\n\n// 1) Où envoyer l'alerte et où ranger les signaux\nconst email = 'ton.email@exemple.com';\nconst googleSheetUrl = 'https://docs.google.com/spreadsheets/d/COLLE_ICI_L_ID_DE_TA_FEUILLE/edit';\n\n// 2) Mots-clés produits, en français ET en anglais. Un signal n'est gardé que s'il en contient au moins un.\n//    Écris-les en minuscules, avec les accents. « bean » trouve aussi « beans », « fertili » trouve « fertilizer ».\nconst motsCles = [\n  'maïs', 'maize', 'riz', 'rice', 'manioc', 'cassava', 'gari', 'tapioca', 'cacao', 'cocoa', 'café', 'coffee',\n  'poivre', 'pepper', 'piment', 'chili', 'gingembre', 'ginger', 'sésame', 'sesame', 'soja', 'soybean', 'soya',\n  'arachide', 'groundnut', 'peanut', 'oignon', 'onion', 'pomme de terre', 'pommes de terre', 'potato', 'haricot',\n  'niébé', 'cowpea', 'sorgho', 'sorghum', 'millet', 'huile de palme', 'palm oil', 'banane', 'banana',\n  'plantain', 'ananas', 'pineapple', 'avocado', 'mangue', 'mango', 'cajou', 'cashew', 'karité', 'shea',\n  'noix de cola', 'kola', 'volaille', 'poulet', 'poultry', 'chicken', 'œuf', 'oeuf', 'egg', 'poisson', 'fish',\n  'semence', 'seed', 'engrais', 'fertili', 'provende', 'aliment pour bétail', 'animal feed', 'farine', 'flour',\n  'céréale', 'cereal', 'grain', 'vivres', 'denrée', 'foodstuff', 'food supply', 'sucre', 'sugar',\n];\n\n// 3) Mots qui rendent un signal urgent (pénurie, interdiction, flambée des prix…)\nconst motsAlerte = [\n  'pénurie', 'shortage', 'flambée', 'envolée', 'surge', 'spike', 'interdi', 'export ban', 'import ban',\n  'suspend', 'rupture', 'crise', 'crisis', 'déficit', 'deficit', \"appel d'offres\", 'tender',\n  'recherche fournisseur', 'seeking supplier', 'looking for supplier',\n];\n\n// 4) Une actualité n'est gardée que si elle parle aussi de commerce (évite les articles de cuisine ou de santé)\nconst motsCommerce = [\n  'import', 'export', 'prix', 'price', 'marché', 'market', 'demande', 'demand', 'pénurie', 'shortage', 'cours',\n  'filière', 'tonne', 'tons', 'fcfa', 'cfa', 'naira', 'achat', 'buyer', 'supplier', 'fournisseur', 'production',\n  'récolte', 'harvest', 'trade', 'commerce', 'tarif', 'douane', 'customs', 'interdi', 'export ban', 'import ban',\n  'stock', 'cargaison',\n];\n\n// 5) Recherches Google Actualités (même syntaxe que dans Google : OR, guillemets, parenthèses)\nconst recherchesActualites = [\n  { q: 'Cameroun prix (maïs OR riz OR oignon OR \"huile de palme\" OR poisson)', langue: 'fr' },\n  { q: 'Cameroun importation (riz OR poisson OR maïs OR \"huile de palme\" OR blé)', langue: 'fr' },\n  { q: '(Gabon OR Congo OR Tchad OR \"Guinée équatoriale\") importation alimentaire', langue: 'fr' },\n  { q: 'interdiction exportation (maïs OR riz OR oignon OR céréales OR bétail)', langue: 'fr' },\n  { q: 'Cameroun exportation (cacao OR café OR poivre OR banane OR manioc)', langue: 'fr' },\n  { q: 'ZLECAf agriculture', langue: 'fr' },\n  { q: 'Nigeria food import (maize OR rice OR onion OR cassava OR poultry)', langue: 'en' },\n  { q: 'Africa importers suppliers (cocoa OR cashew OR sesame OR ginger)', langue: 'en' },\n  { q: 'Cameroon export (cocoa OR coffee OR pepper OR banana OR cassava)', langue: 'en' },\n];\nconst joursActualites = 3; // n'aller chercher que les articles des 3 derniers jours\n\n// 6) Pays et régions suivis pour les appels d'offres de la Banque mondiale (noms exacts en anglais)\nconst paysAppelsOffres = [\n  'Cameroon', 'Chad', 'Central African Republic', 'Congo, Republic of', 'Gabon', 'Nigeria',\n  'Congo, Democratic Republic of', 'Niger', \"Cote d'Ivoire\", 'Senegal', 'Ghana', 'Benin', 'Togo', 'Mali',\n  'Burkina Faso', 'Guinea', 'Western and Central Africa', 'Central Africa', 'Africa',\n];\n\nreturn [\n  { json: { email, googleSheetUrl, motsCles, motsAlerte, motsCommerce, recherchesActualites, joursActualites, paysAppelsOffres } },\n];\n"
+      },
+      "id": "dbd1f533-4eda-5a7e-8b0d-5c6f9c6d80aa",
+      "name": "Paramètres",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://search.worldbank.org/api/v2/procnotices",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "format",
+              "value": "json"
+            },
+            {
+              "name": "rows",
+              "value": "100"
+            },
+            {
+              "name": "srt",
+              "value": "submission_date"
+            },
+            {
+              "name": "order",
+              "value": "desc"
+            },
+            {
+              "name": "notice_type_exact",
+              "value": "Invitation for Bids"
+            },
+            {
+              "name": "procurement_group_exact",
+              "value": "GO"
+            },
+            {
+              "name": "project_ctry_name_exact",
+              "value": "={{ $json.paysAppelsOffres.join('^') }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "567813e3-6029-5f36-a79c-ea95298ca626",
+      "name": "Banque mondiale : appels d'offres",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        -20
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Met les appels d'offres de la Banque mondiale au format commun des signaux.\n// On ne garde que ceux dont la date limite n'est pas dépassée.\nconst MOIS = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };\nconst enIso = (d) => {\n  const m = /^(\\d{2})-(\\w{3})-(\\d{4})$/.exec(d || '');\n  return m ? `${m[3]}-${MOIS[m[2]] || '01'}-${m[1]}` : '';\n};\nconst aujourdhui = $now.toISODate();\n\nconst sorties = [];\nfor (const n of $input.first().json.procnotices || []) {\n  const dateLimite = (n.submission_deadline_date || '').slice(0, 10);\n  if (dateLimite && dateLimite < aujourdhui) continue;\n  sorties.push({\n    json: {\n      id: `bm:${n.id}`,\n      type: \"Appel d'offres\",\n      source: 'Banque mondiale',\n      date: enIso(n.noticedate),\n      pays: n.project_ctry_name || '',\n      titre: n.bid_description || n.project_name || '',\n      lien: `https://projects.worldbank.org/en/projects-operations/procurement-detail/${n.id}`,\n      acheteur: n.contact_organization || '',\n      contact: [n.contact_name, n.contact_email, n.contact_phone_no].filter(Boolean).join(' · '),\n      date_limite: dateLimite,\n      texte: n.bid_description || '',\n    },\n  });\n}\nreturn sorties;\n"
+      },
+      "id": "8dead2c6-8680-5421-be64-bd72bdbdb363",
+      "name": "Mettre en forme : appels d'offres",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Une adresse de flux RSS Google Actualités par recherche\nconst p = $input.first().json;\nconst LANGUES = { fr: 'hl=fr&gl=FR&ceid=FR:fr', en: 'hl=en-US&gl=US&ceid=US:en' };\nreturn p.recherchesActualites.map((r) => ({\n  json: {\n    url: `https://news.google.com/rss/search?q=${encodeURIComponent(`${r.q} when:${p.joursActualites}d`)}&${LANGUES[r.langue] || LANGUES.fr}`,\n  },\n}));\n"
+      },
+      "id": "7578dc73-7423-54d7-ace1-4a84bb70da65",
+      "name": "Préparer les recherches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {}
+      },
+      "id": "ac6c3577-96af-50b8-a91c-08f0d09fa4a8",
+      "name": "Google Actualités",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        220
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Met les articles au format commun des signaux\nconst sorties = [];\nfor (const item of $input.all()) {\n  const a = item.json;\n  if (!a.link || !a.title) continue;\n  sorties.push({\n    json: {\n      id: `actu:${a.guid || a.link}`,\n      type: 'Actualité',\n      source: 'Google Actualités',\n      date: (a.isoDate || '').slice(0, 10),\n      pays: '',\n      titre: a.title,\n      lien: a.link,\n      acheteur: '',\n      contact: '',\n      date_limite: '',\n      texte: `${a.title} ${a.contentSnippet || ''}`,\n    },\n  });\n}\nreturn sorties;\n"
+      },
+      "id": "06f23f9e-e525-5af3-9326-51e33c7d851b",
+      "name": "Mettre en forme : actualités",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        220
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f8e744b4-6b68-55a8-8a90-4b8334b32148",
+      "name": "Rassembler",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1160,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Garde les signaux qui parlent de tes produits (et, pour les actualités, de commerce), repère les pays cités,\n// marque les urgents et ne laisse passer que ceux jamais vus lors des passages précédents.\nconst p = $('Paramètres').first().json;\nconst aujourdhui = $now.toISODate();\n\nconst echapper = (s) => s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\nconst debutDeMot = (mot) => new RegExp(`(^|[^\\\\p{L}])${echapper(mot)}`, 'iu');\nconst motEntier = (mot) => new RegExp(`(^|[^\\\\p{L}])${echapper(mot)}($|[^\\\\p{L}])`, 'iu');\nconst reglesProduits = p.motsCles.map((m) => [m, debutDeMot(m)]);\nconst reglesAlerte = p.motsAlerte.map((m) => [m, debutDeMot(m)]);\nconst reglesCommerce = p.motsCommerce.map((m) => debutDeMot(m));\n\nconst PAYS = [\n  ['Cameroun', ['cameroun', 'cameroon']], ['Nigeria', ['nigeria']], ['Gabon', ['gabon']],\n  ['Congo', ['congo', 'rdc', 'drc']], ['Tchad', ['tchad', 'chad']], ['Centrafrique', ['centrafrique', 'centrafricaine', 'central african']],\n  ['Guinée équatoriale', ['guinée équatoriale', 'equatorial guinea']], [\"Côte d'Ivoire\", [\"côte d'ivoire\", \"cote d'ivoire\", 'ivory coast']],\n  ['Ghana', ['ghana']], ['Sénégal', ['sénégal', 'senegal']], ['Bénin', ['bénin', 'benin']], ['Togo', ['togo']],\n  ['Niger', ['niger']], ['Mali', ['mali']], ['Burkina Faso', ['burkina']], ['Guinée', ['guinée', 'guinea']],\n  ['Maroc', ['maroc', 'morocco']], ['Algérie', ['algérie', 'algeria']], ['Tunisie', ['tunisie', 'tunisia']],\n  ['Égypte', ['égypte', 'egypt']], ['Kenya', ['kenya']], ['Éthiopie', ['éthiopie', 'ethiopia']],\n  ['Afrique du Sud', ['afrique du sud', 'south africa']], ['Angola', ['angola']], ['Tanzanie', ['tanzanie', 'tanzania']],\n  ['France', ['france']], ['Belgique', ['belgique', 'belgium']], ['Pays-Bas', ['pays-bas', 'netherlands']],\n  ['Allemagne', ['allemagne', 'germany']], ['Chine', ['chine', 'china']], ['Inde', ['inde', 'india']],\n  ['Turquie', ['turquie', 'turkey', 'türkiye']], ['Émirats', ['émirats', 'emirates', 'uae', 'dubai', 'dubaï']],\n  ['États-Unis', ['états-unis', 'united states', 'usa']],\n].map(([nom, variantes]) => [nom, variantes.map(motEntier)]);\n\nconst memoire = $getWorkflowStaticData('global');\nmemoire.dejaVus ??= [];\nconst vus = new Set(memoire.dejaVus);\n\nconst sorties = [];\nfor (const item of $input.all()) {\n  const s = item.json;\n  if (!s.id || vus.has(s.id)) continue;\n  const texte = s.texte || s.titre || '';\n  const produits = reglesProduits.filter(([, r]) => r.test(texte)).map(([m]) => m);\n  if (!produits.length) continue;\n  if (s.type === 'Actualité' && !reglesCommerce.some((r) => r.test(texte))) continue;\n  vus.add(s.id);\n  memoire.dejaVus.push(s.id);\n\n  const alertes = reglesAlerte.filter(([, r]) => r.test(texte)).map(([m]) => m);\n  const paysCites = PAYS.filter(([, regles]) => regles.some((r) => r.test(texte))).map(([nom]) => nom);\n  sorties.push({\n    json: {\n      date_detection: aujourdhui,\n      priorite: s.type === \"Appel d'offres\" || alertes.length ? 'haute' : 'normale',\n      type: s.type,\n      source: s.source,\n      pays: s.pays || paysCites.join(', '),\n      produits: [...new Set(produits)].join(', '),\n      titre: s.titre,\n      lien: s.lien,\n      acheteur: s.acheteur,\n      contact: s.contact,\n      date_limite: s.date_limite,\n      date: s.date,\n      statut: 'nouveau',\n      notes: '',\n      id: s.id,\n    },\n  });\n}\n\n// La mémoire garde les 5 000 derniers signaux vus\nmemoire.dejaVus = memoire.dejaVus.slice(-5000);\n\nconst ordre = (o) => (o.type === \"Appel d'offres\" ? 0 : 1) + (o.priorite === 'haute' ? 0 : 2);\nsorties.sort((a, b) => ordre(a.json) - ordre(b.json) || String(b.json.date).localeCompare(String(a.json.date)));\nreturn sorties;\n"
+      },
+      "id": "388851e8-2de7-52cf-8463-97646369dfab",
+      "name": "Garder les nouveaux signaux",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Paramètres').first().json.googleSheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Signaux"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "089ef1c4-16fb-56b6-9d9e-20f22f581c80",
+      "name": "Google Sheets : Signaux",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Met en forme l'alerte du jour (les 40 premiers signaux ; tout est dans la Google Sheet)\nconst p = $('Paramètres').first().json;\nconst signaux = $input.all().map((i) => i.json);\nconst ao = signaux.filter((s) => s.type === \"Appel d'offres\");\nconst actus = signaux.filter((s) => s.type !== \"Appel d'offres\");\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nconst ligne = (s) => `\n  <li style=\"margin:0 0 10px\">\n    ${s.priorite === 'haute' ? '<b style=\"color:#b03434\">●</b> ' : ''}<a href=\"${esc(s.lien)}\">${esc(s.titre)}</a><br>\n    <span style=\"color:#5a6a67;font-size:13px\">${[s.pays, s.produits, s.date_limite && 'date limite ' + s.date_limite, s.acheteur, s.contact]\n      .filter(Boolean)\n      .map(esc)\n      .join(' · ')}</span>\n  </li>`;\n\nconst html = `\n<div style=\"font-family:Segoe UI,Arial,sans-serif;color:#13201e;max-width:760px\">\n  <h2 style=\"margin:0 0 4px\">Veille Afrique : ${signaux.length} nouveaux signaux</h2>\n  <p style=\"margin:0 0 16px;color:#5a6a67\">Tout est rangé dans <a href=\"${esc(p.googleSheetUrl)}\">ta Google Sheet</a>, onglet « Signaux ». Mets à jour la colonne « statut » quand tu as contacté quelqu'un.</p>\n  ${ao.length ? `<h3 style=\"margin:16px 0 8px\">Appels d'offres (${ao.length})</h3><ul style=\"padding-left:18px\">${ao.slice(0, 20).map(ligne).join('')}</ul>` : ''}\n  ${actus.length ? `<h3 style=\"margin:16px 0 8px\">Actualités (${actus.length})</h3><ul style=\"padding-left:18px\">${actus.slice(0, 40 - Math.min(ao.length, 20)).map(ligne).join('')}</ul>` : ''}\n  <p style=\"font-size:12px;color:#8a9895;margin-top:16px\"><b style=\"color:#b03434\">●</b> = urgent (appel d'offres, pénurie, interdiction, flambée des prix…).</p>\n</div>`;\n\nreturn [{ json: { sujet: `Veille Afrique : ${signaux.length} nouveaux signaux${ao.length ? ` dont ${ao.length} appel(s) d'offres` : ''}`, html } }];\n"
+      },
+      "id": "f408b3ce-5f99-5e74-9155-f1c9bc13bfdb",
+      "name": "Préparer l'email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Paramètres').first().json.email }}",
+        "subject": "={{ $json.sujet }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "0ff80742-ef8d-5cc6-bc7e-57baf173005e",
+      "name": "Envoyer l'alerte",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1820,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Lancer à la main": {
+      "main": [
+        [
+          {
+            "node": "Paramètres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chaque matin à 7 h": {
+      "main": [
+        [
+          {
+            "node": "Paramètres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Paramètres": {
+      "main": [
+        [
+          {
+            "node": "Banque mondiale : appels d'offres",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Préparer les recherches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Banque mondiale : appels d'offres": {
+      "main": [
+        [
+          {
+            "node": "Mettre en forme : appels d'offres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mettre en forme : appels d'offres": {
+      "main": [
+        [
+          {
+            "node": "Rassembler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer les recherches": {
+      "main": [
+        [
+          {
+            "node": "Google Actualités",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Actualités": {
+      "main": [
+        [
+          {
+            "node": "Mettre en forme : actualités",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mettre en forme : actualités": {
+      "main": [
+        [
+          {
+            "node": "Rassembler",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Rassembler": {
+      "main": [
+        [
+          {
+            "node": "Garder les nouveaux signaux",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Garder les nouveaux signaux": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets : Signaux",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Préparer l'email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer l'email": {
+      "main": [
+        [
+          {
+            "node": "Envoyer l'alerte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Douala",
+    "saveManualExecutions": true
+  },
+  "active": false,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

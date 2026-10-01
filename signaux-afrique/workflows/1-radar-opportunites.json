@@ -1,0 +1,452 @@
+{
+  "name": "Radar 1 : opportunités import-export (ONU Comtrade)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Radar 1 : opportunités d'import / export\nChaque 1er du mois, ce workflow regarde ce que **le Cameroun, ses voisins et de grands marchés achètent à l'étranger** (chiffres officiels des douanes, ONU Comtrade), calcule un **score de 0 à 100** pour chaque couple pays + produit, range tout dans Google Sheets et t'envoie par email les 15 meilleures pistes avec **qui les fournit aujourd'hui**.\n\n**À faire une fois :**\n1. Ouvre le nœud **Paramètres** : ton email, l'adresse de ta Google Sheet, tes produits et leur statut.\n2. Choisis ton compte Google dans les 2 nœuds Google Sheets et dans le nœud Gmail.\n3. Clique sur **Execute workflow** pour tester, puis active le workflow.",
+        "height": 300,
+        "width": 560
+      },
+      "id": "d46a4a99-ca3b-5d87-9874-a642b2de6318",
+      "name": "Mode d’emploi",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -360
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "e90d07f5-ca63-510e-86a2-b7af63dff956",
+      "name": "Lancer à la main",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "triggerAtDayOfMonth": 1,
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "id": "ec34689d-9cb5-5904-b6dd-682827685aa2",
+      "name": "Chaque 1er du mois",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================================\n//  PARAMÈTRES DU RADAR : c'est le seul nœud à modifier.\n//  Source : ONU Comtrade (importations déclarées par les douanes de chaque pays).\n// =====================================================================\n\n// 1) Où envoyer le résumé et où ranger les résultats\nconst email = 'ton.email@exemple.com';\nconst googleSheetUrl = 'https://docs.google.com/spreadsheets/d/COLLE_ICI_L_ID_DE_TA_FEUILLE/edit';\n\n// 2) Tes produits (code douanier SH à 4 ou 6 chiffres).\n//    statut = ce que tu peux faire avec ce produit :\n//      'je produis'        → tu l'as déjà à la ferme\n//      'je peux produire'  → tu pourrais le cultiver ou l'élever\n//      'je peux sourcer'   → tu ne le produis pas, mais tu connais des producteurs (apporteur d'affaires)\n//      ''                  → simple surveillance\nconst produits = [\n  // Vivrier : ce que le Cameroun et ses voisins achètent à l'étranger\n  { hs: '1006', nom: 'Riz', statut: '' },\n  { hs: '1005', nom: 'Maïs', statut: '' },\n  { hs: '0714', nom: 'Manioc, patates douces, tubercules', statut: '' },\n  { hs: '1106', nom: 'Farines de manioc et de tubercules', statut: '' },\n  { hs: '1108', nom: 'Amidons (dont amidon de manioc)', statut: '' },\n  { hs: '0703', nom: 'Oignons, ail, échalotes', statut: '' },\n  { hs: '0701', nom: 'Pommes de terre', statut: '' },\n  { hs: '0713', nom: 'Haricots et légumes secs', statut: '' },\n  { hs: '1201', nom: 'Soja', statut: '' },\n  { hs: '1202', nom: 'Arachides', statut: '' },\n  { hs: '0207', nom: 'Viande de volaille', statut: '' },\n  { hs: '0407', nom: 'Œufs', statut: '' },\n  { hs: '0303', nom: 'Poisson congelé', statut: '' },\n  { hs: '1511', nom: 'Huile de palme', statut: '' },\n  { hs: '1701', nom: 'Sucre', statut: '' },\n  { hs: '230990', nom: 'Provende (aliments pour volaille et bétail)', statut: '' },\n  // Export : ce que le Cameroun sait vendre au reste du monde\n  { hs: '1801', nom: 'Fèves de cacao', statut: '' },\n  { hs: '0901', nom: 'Café', statut: '' },\n  { hs: '0904', nom: 'Poivre et piments', statut: '' },\n  { hs: '0910', nom: 'Gingembre, curcuma et épices', statut: '' },\n  { hs: '0803', nom: 'Bananes et plantains', statut: '' },\n  { hs: '0804', nom: 'Ananas, avocats, mangues', statut: '' },\n  { hs: '0801', nom: 'Noix de cajou et noix de coco', statut: '' },\n  { hs: '1207', nom: 'Sésame, karité et autres graines', statut: '' },\n];\n\n// 3) Les marchés à surveiller (code pays de l'ONU).\n//    proximite : 1 = très facile d'accès (route, zone CEMAC) … 0.3 = loin ou normes exigeantes\nconst pays = [\n  { code: 120, nom: 'Cameroun', zone: 'Cameroun', proximite: 1 },\n  { code: 266, nom: 'Gabon', zone: 'CEMAC', proximite: 0.9 },\n  { code: 178, nom: 'Congo', zone: 'CEMAC', proximite: 0.9 },\n  { code: 226, nom: 'Guinée équatoriale', zone: 'CEMAC', proximite: 0.9 },\n  { code: 148, nom: 'Tchad', zone: 'CEMAC', proximite: 0.9 },\n  { code: 140, nom: 'Centrafrique', zone: 'CEMAC', proximite: 0.8 },\n  { code: 566, nom: 'Nigeria', zone: 'Afrique', proximite: 0.8 },\n  { code: 180, nom: 'RD Congo', zone: 'Afrique', proximite: 0.6 },\n  { code: 562, nom: 'Niger', zone: 'Afrique', proximite: 0.6 },\n  { code: 204, nom: 'Bénin', zone: 'Afrique', proximite: 0.6 },\n  { code: 768, nom: 'Togo', zone: 'Afrique', proximite: 0.5 },\n  { code: 288, nom: 'Ghana', zone: 'Afrique', proximite: 0.5 },\n  { code: 384, nom: \"Côte d'Ivoire\", zone: 'Afrique', proximite: 0.5 },\n  { code: 686, nom: 'Sénégal', zone: 'Afrique', proximite: 0.5 },\n  { code: 504, nom: 'Maroc', zone: 'Afrique', proximite: 0.4 },\n  { code: 12, nom: 'Algérie', zone: 'Afrique', proximite: 0.4 },\n  { code: 251, nom: 'France', zone: 'Hors Afrique', proximite: 0.3 },\n  { code: 56, nom: 'Belgique', zone: 'Hors Afrique', proximite: 0.3 },\n  { code: 528, nom: 'Pays-Bas', zone: 'Hors Afrique', proximite: 0.3 },\n  { code: 276, nom: 'Allemagne', zone: 'Hors Afrique', proximite: 0.3 },\n  { code: 380, nom: 'Italie', zone: 'Hors Afrique', proximite: 0.3 },\n  { code: 826, nom: 'Royaume-Uni', zone: 'Hors Afrique', proximite: 0.3 },\n  { code: 842, nom: 'États-Unis', zone: 'Hors Afrique', proximite: 0.3 },\n  { code: 156, nom: 'Chine', zone: 'Hors Afrique', proximite: 0.3 },\n  { code: 784, nom: 'Émirats arabes unis', zone: 'Hors Afrique', proximite: 0.3 },\n];\n\n// 4) Réglages\nconst nbAnnees = 5; // années d'historique demandées (la plus récente = l'an dernier)\nconst topN = 15; // nombre d'opportunités détaillées dans l'email (2 pays maximum par produit)\n\n// 5) Facultatif : clé gratuite ONU Comtrade (comtradedeveloper.un.org) pour dépasser le quota de la version sans clé.\n//    Laisse '' si tu n'en as pas.\nconst cleComtrade = '';\nconst urlComtrade = cleComtrade\n  ? 'https://comtradeapi.un.org/data/v1/get/C/A/HS'\n  : 'https://comtradeapi.un.org/public/v1/preview/C/A/HS';\n\nreturn [{ json: { email, googleSheetUrl, produits, pays, nbAnnees, topN, cleComtrade, urlComtrade } }];\n"
+      },
+      "id": "ee9b2bf6-3a08-5a14-a2ee-f5808c5af0ef",
+      "name": "Paramètres",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fabrique les adresses à interroger chez ONU Comtrade.\n// Version sans clé : une seule année par requête, 500 lignes maximum par réponse, et un quota d'appels.\nconst p = $input.first().json;\nconst derniereAnnee = new Date().getFullYear() - 1;\nconst annees = Array.from({ length: p.nbAnnees }, (_, i) => derniereAnnee - i);\nconst codesPays = p.pays.map((x) => x.code).join(',');\n\n// Autant de produits par requête que possible sans dépasser 500 lignes\nconst parLot = Math.max(1, Math.floor(450 / p.pays.length));\nconst lots = [];\nfor (let i = 0; i < p.produits.length; i += parLot) {\n  lots.push(p.produits.slice(i, i + parLot).map((x) => x.hs).join(','));\n}\n\nconst requetes = [];\nfor (const annee of annees) {\n  for (const codesProduits of lots) {\n    const url = `${p.urlComtrade}?reporterCode=${codesPays}&period=${annee}&partnerCode=0&cmdCode=${codesProduits}&flowCode=M`;\n    requetes.push({ json: { annee, url: p.cleComtrade ? `${url}&subscription-key=${encodeURIComponent(p.cleComtrade)}` : url } });\n  }\n}\nreturn requetes;\n"
+      },
+      "id": "93038064-5802-5e00-a45d-bdc1abf2351c",
+      "name": "Préparer les requêtes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 3000
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "6b70a5aa-c891-5f9c-af05-2ff1d2f512ff",
+      "name": "Comtrade : importations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        100
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calcule un score de 0 à 100 pour chaque couple pays + produit.\n//   35 % taille du marché : 1 M$ d'importations par an = 0, 1 milliard $ = maximum\n//   25 % croissance       : −10 %/an = 0, +30 %/an = maximum (sur 3 ans au plus)\n//   20 % proximité        : valeur « proximite » du pays dans Paramètres\n//   20 % ta position      : « je produis » > « je peux produire » > « je peux sourcer » > surveillance\nconst p = $('Paramètres').first().json;\nconst paysParCode = Object.fromEntries(p.pays.map((x) => [String(x.code), x]));\nconst produitParCode = Object.fromEntries(p.produits.map((x) => [x.hs, x]));\nconst noteStatut = { 'je produis': 1, 'je peux produire': 0.7, 'je peux sourcer': 0.5 };\nconst anneeCourante = new Date().getFullYear();\nconst aujourdhui = $now.toISODate();\nconst borne = (x, min, max) => Math.min(max, Math.max(min, x));\n\n// 1) Regrouper les chiffres par pays + produit + année\nconst series = {};\nfor (const item of $input.all()) {\n  const lignes = item.json.data;\n  if (!Array.isArray(lignes)) continue; // requête refusée ou vide : on continue avec le reste\n  for (const l of lignes) {\n    if (l.partnerCode !== 0 || l.flowCode !== 'M' || !l.primaryValue) continue;\n    const cle = `${l.reporterCode}-${l.cmdCode}`;\n    const s = (series[cle] ??= { codePays: l.reporterCode, hs: l.cmdCode, annees: {} });\n    const deja = s.annees[l.refYear];\n    if (!deja || l.primaryValue > deja.valeur) {\n      s.annees[l.refYear] = { valeur: l.primaryValue, poids: l.netWgt };\n    }\n  }\n}\n\n// 2) Score de chaque série\nconst resultats = [];\nfor (const [cle, s] of Object.entries(series)) {\n  const pays = paysParCode[String(s.codePays)];\n  const produit = produitParCode[s.hs];\n  if (!pays || !produit) continue;\n\n  const annees = Object.keys(s.annees).map(Number).sort((a, b) => b - a);\n  const derniere = annees[0];\n  const valeur = s.annees[derniere].valeur;\n  const base = annees.filter((a) => a < derniere && a >= derniere - 3).pop();\n  const croissance = base ? Math.pow(valeur / s.annees[base].valeur, 1 / (derniere - base)) - 1 : null;\n  const poids = s.annees[derniere].poids;\n\n  const noteTaille = borne((Math.log10(valeur) - 6) / 3, 0, 1);\n  const noteCroissance = croissance === null ? 0.4 : borne((croissance + 0.1) / 0.4, 0, 1);\n  const noteProximite = borne(Number(pays.proximite) || 0, 0, 1);\n  const notePosition = noteStatut[produit.statut] ?? 0.2;\n  const score = Math.round(\n    100 * (0.35 * noteTaille + 0.25 * noteCroissance + 0.2 * noteProximite + 0.2 * notePosition),\n  );\n\n  let typeSignal = 'Exporter ou faire du courtage en Afrique';\n  if (pays.zone === 'Cameroun') typeSignal = 'Remplacer des importations au Cameroun';\n  if (pays.zone === 'Hors Afrique') typeSignal = \"Exporter hors d'Afrique\";\n\n  resultats.push({\n    cle,\n    score,\n    type_signal: typeSignal,\n    pays: pays.nom,\n    zone: pays.zone,\n    produit: produit.nom,\n    code_hs: s.hs,\n    mon_statut: produit.statut || '',\n    annee: derniere,\n    imports_usd: Math.round(valeur),\n    croissance_annuelle_pct: croissance === null ? '' : Math.round(croissance * 1000) / 10,\n    prix_usd_kg: poids > 0 ? Math.round((valeur / poids) * 100) / 100 : '',\n    donnees_anciennes: derniere < anneeCourante - 3 ? 'oui' : 'non',\n    code_pays: s.codePays,\n    date_maj: aujourdhui,\n  });\n}\n\nif (!resultats.length) {\n  throw new Error(\"Aucune donnée reçue d'ONU Comtrade (limite de requêtes atteinte ?). Relance dans quelques minutes.\");\n}\nresultats.sort((a, b) => b.score - a.score);\nreturn resultats.map((json) => ({ json }));\n"
+      },
+      "id": "afd5214a-3c79-5a98-9aff-854fc9fc4d5e",
+      "name": "Calculer les scores",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Paramètres').first().json.googleSheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Opportunites"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "cle"
+          ],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "dde2476a-fbcb-56e1-b968-93a992bdb4d0",
+      "name": "Google Sheets : toutes les opportunités",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Garde les meilleures opportunités, avec au plus 2 pays par produit pour que la liste reste variée.\nconst p = $('Paramètres').first().json;\nconst parProduit = {};\nconst top = [];\nfor (const item of $input.all()) {\n  const hs = item.json.code_hs;\n  parProduit[hs] = (parProduit[hs] || 0) + 1;\n  if (parProduit[hs] > 2) continue;\n  top.push(item);\n  if (top.length >= p.topN) break;\n}\nreturn top;\n"
+      },
+      "id": "0eef1d67-045b-5849-9dba-2fe125b168a2",
+      "name": "Top N",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Regroupe les opportunités du top par produit et par année : une seule requête Comtrade\n// couvre jusqu'à 4 pays, ce qui économise le quota d'appels de la version gratuite.\nconst p = $('Paramètres').first().json;\nconst groupes = {};\nfor (const item of $input.all()) {\n  const o = item.json;\n  (groupes[`${o.annee}|${o.code_hs}`] ??= []).push(o.code_pays);\n}\nconst requetes = [];\nfor (const [cle, codesPays] of Object.entries(groupes)) {\n  const [annee, hs] = cle.split('|');\n  for (let i = 0; i < codesPays.length; i += 4) {\n    const url = `${p.urlComtrade}?reporterCode=${codesPays.slice(i, i + 4).join(',')}&period=${annee}&cmdCode=${hs}&flowCode=M`;\n    requetes.push({ json: { url: p.cleComtrade ? `${url}&subscription-key=${encodeURIComponent(p.cleComtrade)}` : url } });\n  }\n}\nreturn requetes;\n"
+      },
+      "id": "ee7b9bf6-464c-570e-86f7-e202325745bb",
+      "name": "Préparer les requêtes fournisseurs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 3000
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "eafbeb28-1b51-5580-a7c8-7032d0cad2b4",
+      "name": "Comtrade : qui fournit ?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://comtradeapi.un.org/files/v1/app/reference/partnerAreas.json",
+        "options": {}
+      },
+      "id": "54d99acd-a65b-54f5-8c36-ade750dc452f",
+      "name": "Comtrade : noms des pays",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1780,
+        200
+      ],
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pour chaque opportunité du top : qui vend aujourd'hui à ce pays ?\n// Quelle part vient d'Afrique, et quelle part du Cameroun ?\nconst top = $('Top N').all();\nconst lignesFournisseurs = $('Comtrade : qui fournit ?')\n  .all()\n  .flatMap((r) => (Array.isArray(r.json.data) ? r.json.data : []));\nconst noms = {};\nfor (const r of $input.first().json.results || []) noms[String(r.id)] = r.text;\n\n// Codes ONU des pays africains\nconst AFRIQUE = new Set([\n  12, 24, 72, 108, 120, 132, 140, 148, 174, 178, 180, 204, 226, 231, 232, 262, 266, 270, 288, 324, 384,\n  404, 426, 430, 434, 450, 454, 466, 478, 480, 504, 508, 516, 562, 566, 624, 646, 654, 678, 686, 690,\n  694, 706, 710, 711, 716, 728, 729, 732, 748, 768, 788, 800, 818, 834, 854, 894,\n]);\nconst CAMEROUN = 120;\n\nconst pct = (x) => Math.round(x * 1000) / 10;\nconst virgule = (x) => String(x).replace('.', ',');\nconst montant = (v) =>\n  v >= 1e9 ? `${virgule((v / 1e9).toFixed(2))} Md$` : v >= 1e6 ? `${virgule((v / 1e6).toFixed(1))} M$` : `${Math.round(v / 1e3)} k$`;\n\nreturn top.map((item) => {\n  const o = { ...item.json };\n  const lignes = lignesFournisseurs.filter(\n    (l) => l.reporterCode === o.code_pays && l.cmdCode === o.code_hs && l.refYear === o.annee,\n  );\n\n  // Une ligne par fournisseur (on garde la plus grosse si doublon)\n  const parFournisseur = {};\n  for (const l of lignes) {\n    if (l.partnerCode === 0 || l.flowCode !== 'M' || !l.primaryValue) continue;\n    const deja = parFournisseur[l.partnerCode];\n    if (!deja || l.primaryValue > deja.primaryValue) parFournisseur[l.partnerCode] = l;\n  }\n  const liste = Object.values(parFournisseur).sort((a, b) => b.primaryValue - a.primaryValue);\n  const total = liste.reduce((a, l) => a + l.primaryValue, 0);\n\n  if (!total) {\n    o.part_afrique_pct = '';\n    o.part_cameroun_pct = '';\n    o.principaux_fournisseurs = 'non disponible';\n  } else {\n    const afrique = liste\n      .filter((l) => AFRIQUE.has(l.partnerCode) && l.partnerCode !== o.code_pays)\n      .reduce((a, l) => a + l.primaryValue, 0);\n    const cameroun = parFournisseur[CAMEROUN]?.primaryValue || 0;\n    o.part_afrique_pct = pct(afrique / total);\n    o.part_cameroun_pct = o.code_pays === CAMEROUN ? '' : pct(cameroun / total);\n    o.principaux_fournisseurs = liste\n      .slice(0, 3)\n      .map((l) => `${noms[String(l.partnerCode)] || 'Pays ' + l.partnerCode} ${Math.round((100 * l.primaryValue) / total)} %`)\n      .join(', ');\n\n    // Prix moyen au kilo, si la ligne « monde » ne le donnait pas\n    if (o.prix_usd_kg === '') {\n      const avecPoids = liste.filter((l) => l.netWgt > 0);\n      const poids = avecPoids.reduce((a, l) => a + l.netWgt, 0);\n      if (poids) o.prix_usd_kg = Math.round((avecPoids.reduce((a, l) => a + l.primaryValue, 0) / poids) * 100) / 100;\n    }\n  }\n\n  // Une phrase lisible\n  const tendance = o.croissance_annuelle_pct === '' ? '' : ` (${o.croissance_annuelle_pct > 0 ? '+' : ''}${virgule(o.croissance_annuelle_pct)} %/an)`;\n  let phrase = `${o.pays} : ${montant(o.imports_usd)} d'importations de « ${o.produit} » en ${o.annee}${tendance}.`;\n  if (total) {\n    phrase += ` Fournisseurs : ${o.principaux_fournisseurs}.`;\n    if (o.code_pays === CAMEROUN) {\n      phrase += ` ${virgule(pct(1 - o.part_afrique_pct / 100))} % vient de l'extérieur de l'Afrique : place pour une production locale.`;\n    } else {\n      phrase += ` Part de l'Afrique : ${virgule(o.part_afrique_pct)} %, du Cameroun : ${virgule(o.part_cameroun_pct)} %.`;\n    }\n  }\n  if (o.donnees_anciennes === 'oui') phrase += ' Attention : données anciennes.';\n  o.resume = phrase;\n  return { json: o };\n});\n"
+      },
+      "id": "c44768bb-b2d2-5938-bfa2-ae8460977dee",
+      "name": "Analyser les fournisseurs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Paramètres').first().json.googleSheetUrl }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Opportunites"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "cle"
+          ],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "2c4df51a-bea7-5b88-9209-a97f70d01a87",
+      "name": "Google Sheets : détails du top",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2220,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Met en forme l'email du mois.\nconst p = $('Paramètres').first().json;\nconst lignes = $input.all().map((i) => i.json);\nconst tous = $('Calculer les scores').all().map((i) => i.json);\nconst paysAvecDonnees = new Set(tous.map((r) => r.pays));\nconst paysSansDonnees = p.pays.filter((x) => !paysAvecDonnees.has(x.nom)).map((x) => x.nom);\n\n// Requêtes refusées (quota de la version gratuite) : les chiffres peuvent être incomplets\nconst echecs = [...$('Comtrade : importations').all(), ...$('Comtrade : qui fournit ?').all()].filter(\n  (r) => !Array.isArray(r.json.data),\n).length;\nconst avertissement = echecs\n  ? `<p style=\"background:#fbf0d9;border-radius:8px;padding:10px 12px;margin:0 0 16px;font-size:14px\"><b>${echecs} requête(s) ONU Comtrade refusée(s)</b> (quota de la version gratuite, rechargé toutes les 10 minutes). Certains chiffres peuvent manquer : relance le workflow dans 10 minutes.</p>`\n  : '';\n\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst couleur = (score) => (score >= 70 ? '#1f7a4d' : score >= 50 ? '#9a6410' : '#5f6b69');\n\nconst rangees = lignes\n  .map(\n    (o, i) => `\n  <tr>\n    <td style=\"padding:10px 8px;border-bottom:1px solid #e3e8e6;vertical-align:top;font-weight:600\">${i + 1}</td>\n    <td style=\"padding:10px 8px;border-bottom:1px solid #e3e8e6;vertical-align:top\">\n      <span style=\"display:inline-block;min-width:34px;text-align:center;padding:2px 6px;border-radius:6px;color:#fff;background:${couleur(o.score)};font-weight:700\">${o.score}</span>\n    </td>\n    <td style=\"padding:10px 8px;border-bottom:1px solid #e3e8e6;vertical-align:top\">\n      <b>${esc(o.produit)}</b> → <b>${esc(o.pays)}</b><br>\n      <span style=\"color:#5a6a67;font-size:13px\">${esc(o.type_signal)}${o.mon_statut ? ' · ' + esc(o.mon_statut) : ''}${o.prix_usd_kg !== '' ? ' · ~' + String(o.prix_usd_kg).replace('.', ',') + ' $/kg' : ''}</span><br>\n      <span style=\"font-size:14px\">${esc(o.resume)}</span>\n    </td>\n  </tr>`,\n  )\n  .join('');\n\nconst html = `\n<div style=\"font-family:Segoe UI,Arial,sans-serif;color:#13201e;max-width:760px\">\n  <h2 style=\"margin:0 0 4px\">Radar commerce Afrique : ${lignes.length} opportunités à regarder</h2>\n  <p style=\"margin:0 0 16px;color:#5a6a67\">Classées par score (taille du marché, croissance, proximité, ta position sur le produit). Tableau complet : <a href=\"${esc(p.googleSheetUrl)}\">ta Google Sheet</a>, onglet « Opportunites ».</p>\n  ${avertissement}\n  <table style=\"border-collapse:collapse;width:100%;font-size:14px\">${rangees}</table>\n  <h3 style=\"margin:24px 0 6px\">Que faire de ces signaux ?</h3>\n  <ul style=\"margin:0;padding-left:18px;font-size:14px;line-height:1.5\">\n    <li><b>Remplacer des importations au Cameroun</b> : va voir les importateurs et grossistes (Douala, Yaoundé) ; compare le prix d'import au kilo avec ton coût de revient.</li>\n    <li><b>Exporter ou faire du courtage en Afrique</b> : cherche les importateurs du pays (chambre de commerce, ambassade, plateformes B2B) et propose-leur une offre ; vérifie les règles CEMAC / ZLECAf.</li>\n    <li><b>Exporter hors d'Afrique</b> : vérifie d'abord les normes (certificat phytosanitaire, traçabilité, règlement européen anti-déforestation pour cacao et café).</li>\n  </ul>\n  ${paysSansDonnees.length ? `<p style=\"font-size:13px;color:#5a6a67;margin-top:16px\">Pays sans chiffres récents chez ONU Comtrade (leurs douanes ne publient pas ou en retard) : ${esc(paysSansDonnees.join(', '))}. Pour eux, appuie-toi sur la veille quotidienne et les contacts terrain.</p>` : ''}\n  <p style=\"font-size:12px;color:#8a9895;margin-top:16px\">Source : ONU Comtrade (données annuelles officielles, publiées avec 1 à 2 ans de retard). Un signal est une piste à vérifier, pas une commande.</p>\n</div>`;\n\nconst mois = $now.setLocale('fr').toFormat('LLLL yyyy');\nreturn [{ json: { sujet: `Radar commerce Afrique : ${lignes.length} opportunités (${mois})`, html } }];\n"
+      },
+      "id": "b220a8e5-968b-56ba-8959-6bb9b08c14e1",
+      "name": "Préparer l'email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Paramètres').first().json.email }}",
+        "subject": "={{ $json.sujet }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "68eb4280-bff6-5b1d-ad23-956204686e17",
+      "name": "Envoyer le résumé",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2440,
+        260
+      ]
+    }
+  ],
+  "connections": {
+    "Lancer à la main": {
+      "main": [
+        [
+          {
+            "node": "Paramètres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chaque 1er du mois": {
+      "main": [
+        [
+          {
+            "node": "Paramètres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Paramètres": {
+      "main": [
+        [
+          {
+            "node": "Préparer les requêtes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer les requêtes": {
+      "main": [
+        [
+          {
+            "node": "Comtrade : importations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comtrade : importations": {
+      "main": [
+        [
+          {
+            "node": "Calculer les scores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculer les scores": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets : toutes les opportunités",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Top N",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Top N": {
+      "main": [
+        [
+          {
+            "node": "Préparer les requêtes fournisseurs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer les requêtes fournisseurs": {
+      "main": [
+        [
+          {
+            "node": "Comtrade : qui fournit ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comtrade : qui fournit ?": {
+      "main": [
+        [
+          {
+            "node": "Comtrade : noms des pays",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comtrade : noms des pays": {
+      "main": [
+        [
+          {
+            "node": "Analyser les fournisseurs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyser les fournisseurs": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets : détails du top",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Préparer l'email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer l'email": {
+      "main": [
+        [
+          {
+            "node": "Envoyer le résumé",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Douala",
+    "saveManualExecutions": true
+  },
+  "active": false,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

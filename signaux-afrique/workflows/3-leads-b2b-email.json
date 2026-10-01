@@ -1,0 +1,123 @@
+{
+  "name": "Radar 3 : leads B2B reçus par email",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Radar 3 : leads B2B reçus par email\nInscris-toi (gratuitement) sur des plateformes B2B comme Go4WorldBusiness, Tridge, TradeKey, ExportHub ou EC21 et active leurs **alertes email** sur tes produits. Ce workflow lit ces emails toutes les heures et crée une **fiche contact** dans l'onglet **Contacts** : acheteur ou vendeur, produits, pays, quantité, coordonnées, et une alerte si l'email ressemble à une arnaque (frais d'inscription, Western Union…).\n\n**À faire une fois :** dans Gmail, crée un libellé **leads-b2b** et un filtre qui y range ces emails ; choisis ton compte Google dans les nœuds ; colle l'adresse de ta Google Sheet dans le nœud Google Sheets ; active le workflow.",
+        "height": 300,
+        "width": 600
+      },
+      "id": "9248c99f-e4fd-550e-8b26-34cab1d51b7c",
+      "name": "Mode d’emploi",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -340
+      ]
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyHour"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "label:leads-b2b OR from:(go4worldbusiness.com OR tridge.com OR tradekey.com OR exporthub.com OR ec21.com OR tradewheel.com)",
+          "readStatus": "both"
+        },
+        "options": {}
+      },
+      "id": "08f39468-4727-5506-998f-0d68aa84ba40",
+      "name": "Nouvel email de plateforme B2B",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lit chaque email de plateforme B2B (Go4WorldBusiness, Tridge, TradeKey…) et en tire une fiche contact :\n// achat ou vente, produits, pays, quantité, coordonnées, et points de vigilance (arnaques fréquentes).\nconst echapper = (s) => s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\nconst debutDeMot = (mot) => new RegExp(`(^|[^\\\\p{L}])${echapper(mot)}`, 'iu');\nconst motEntier = (mot) => new RegExp(`(^|[^\\\\p{L}])${echapper(mot)}($|[^\\\\p{L}])`, 'iu');\nconst trouver = (texte, liste, regle) =>\n  liste.filter(([, variantes]) => variantes.some((v) => regle(v).test(texte))).map(([nom]) => nom);\n\nconst PRODUITS = [\n  ['Cacao', ['cocoa', 'cacao']], ['Café', ['coffee', 'café']], ['Poivre / piment', ['pepper', 'poivre', 'chili', 'piment']],\n  ['Gingembre', ['ginger', 'gingembre']], ['Sésame', ['sesame', 'sésame']], ['Cajou', ['cashew', 'cajou']],\n  ['Karité', ['shea', 'karité']], ['Maïs', ['maize', 'yellow corn', 'white corn', 'maïs']], ['Riz', ['rice', 'riz']],\n  ['Manioc / gari', ['cassava', 'manioc', 'gari', 'tapioca']], ['Soja', ['soybean', 'soya', 'soja']],\n  ['Arachide', ['groundnut', 'peanut', 'arachide']], ['Haricot / niébé', ['kidney bean', 'white bean', 'red bean', 'dry bean', 'black-eyed', 'haricot', 'cowpea', 'niébé']],\n  ['Huile de palme', ['palm oil', 'huile de palme', 'palm kernel']], ['Banane / plantain', ['banana', 'plantain', 'banane']],\n  ['Ananas', ['pineapple', 'ananas']], ['Avocat', ['avocado', 'avocat']], ['Mangue', ['mango', 'mangue']],\n  ['Oignon', ['onion', 'oignon']], ['Volaille / œufs', ['poultry', 'chicken', 'egg', 'volaille', 'poulet', 'œuf', 'oeuf']],\n  ['Poisson', ['fish', 'poisson', 'tilapia', 'catfish', 'silure']], ['Bois', ['timber', 'sawn wood', 'bois']],\n  ['Engrais / semences', ['fertilizer', 'fertiliser', 'engrais', 'seed', 'semence']], ['Sucre', ['sugar', 'sucre']],\n  ['Blé', ['wheat', 'blé']], ['Farines', ['flour', 'farine']], ['Noix de cola', ['kola', 'cola nut', 'noix de cola']],\n];\nconst PAYS = [\n  ['Cameroun', ['cameroon', 'cameroun']], ['Nigeria', ['nigeria']], ['Gabon', ['gabon']], ['Congo', ['congo']],\n  ['Tchad', ['chad', 'tchad']], ['Ghana', ['ghana']], [\"Côte d'Ivoire\", [\"côte d'ivoire\", \"cote d'ivoire\", 'ivory coast']],\n  ['Sénégal', ['senegal', 'sénégal']], ['Maroc', ['morocco', 'maroc']], ['Égypte', ['egypt', 'égypte']],\n  ['Afrique du Sud', ['south africa', 'afrique du sud']], ['Kenya', ['kenya']], ['France', ['france']],\n  ['Belgique', ['belgium', 'belgique']], ['Pays-Bas', ['netherlands', 'holland', 'pays-bas']], ['Allemagne', ['germany', 'allemagne']],\n  ['Italie', ['italy', 'italie']], ['Espagne', ['spain', 'espagne']], ['Royaume-Uni', ['united kingdom', 'uk', 'royaume-uni']],\n  ['États-Unis', ['usa', 'united states', 'états-unis']], ['Canada', ['canada']], ['Chine', ['china', 'chine']],\n  ['Inde', ['india', 'inde']], ['Turquie', ['turkey', 'türkiye', 'turquie']], ['Émirats', ['uae', 'dubai', 'emirates', 'émirats']],\n  ['Arabie saoudite', ['saudi', 'arabie saoudite']], ['Liban', ['lebanon', 'liban']], ['Vietnam', ['vietnam', 'viet nam']],\n];\nconst ACHAT = ['buy', 'buying', 'buyer', 'purchase', 'looking for', 'we need', 'requirement', 'required', 'rfq', 'request for quotation', 'importer', 'achat', 'acheter', 'achète', 'recherche', 'besoin'];\nconst VENTE = ['sell', 'selling', 'seller', 'for sale', 'we supply', 'we offer', 'supplier of', 'exporter of', 'vend', 'vente', 'propose', 'fournisseur de'];\nconst VIGILANCE = [\n  'western union', 'moneygram', 'registration fee', 'membership fee', 'sample fee', 'processing fee', 'inspection fee',\n  'advance payment', 'pay in advance', 'gift card', 'bitcoin', 'crypto', \"frais d'inscription\", \"frais d'échantillon\",\n  'frais de dossier', \"paiement d'avance\", 'avance de fonds',\n];\n\nreturn $input.all().map((item) => {\n  const m = item.json;\n  const sujet = m.subject || m.Subject || '';\n  const corps = (m.text || m.snippet || '').replace(/\\s+/g, ' ').trim();\n  const texte = `${sujet} ${corps}`;\n  const expediteur = m.from?.value?.[0]?.address || m.From || '';\n  const domaine = (expediteur.split('@')[1] || '').replace(/^(mail|email|info|news|noreply|no-reply)\\./, '').replace(/>.*$/, '');\n\n  const achat = ACHAT.some((w) => debutDeMot(w).test(texte));\n  const vente = VENTE.some((w) => debutDeMot(w).test(texte));\n  const sens = achat && !vente ? 'acheteur' : vente && !achat ? 'vendeur' : 'à vérifier';\n\n  const quantite = (texte.match(/\\d[\\d.,\\s]*\\s*(?:mt|metric tons?|tons?|tonnes?|kg|containers?|conteneurs?|fcl|x\\s?20|x\\s?40|20 ?ft|40 ?ft)\\b/i) || [''])[0].trim();\n  const emails = [...new Set((corps.match(/[\\w.+-]+@[\\w-]+\\.[\\w.-]+/g) || []).map((e) => e.replace(/\\.+$/, '')))]\n    .filter((e) => e !== expediteur)\n    .slice(0, 3);\n  const telephones = [...new Set(corps.match(/\\+\\d[\\d\\s().-]{7,}\\d/g) || [])].slice(0, 3);\n  const alertes = VIGILANCE.filter((w) => texte.toLowerCase().includes(w));\n\n  return {\n    json: {\n      date: (m.date || new Date().toISOString()).slice(0, 10),\n      source: domaine,\n      sens,\n      produits: trouver(texte, PRODUITS, debutDeMot).join(', '),\n      pays: trouver(texte, PAYS, motEntier).join(', '),\n      quantite,\n      sujet,\n      extrait: corps.slice(0, 400),\n      emails: emails.join(', '),\n      telephones: telephones.join(', '),\n      vigilance: alertes.length ? `ATTENTION : ${alertes.join(', ')}` : '',\n      lien_gmail: `https://mail.google.com/mail/u/0/#all/${m.threadId || m.id}`,\n      statut: 'nouveau',\n      prochaine_action: '',\n      notes: '',\n      id: m.id,\n    },\n  };\n});\n"
+      },
+      "id": "eeba5dbf-9563-5799-a5ac-067e18e56cd6",
+      "name": "Lire le lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/COLLE_ICI_L_ID_DE_TA_FEUILLE/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Contacts"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "adec93f5-4aff-511e-9855-ab5dc55bc7cc",
+      "name": "Google Sheets : Contacts",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Nouvel email de plateforme B2B": {
+      "main": [
+        [
+          {
+            "node": "Lire le lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire le lead": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets : Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Douala",
+    "saveManualExecutions": true
+  },
+  "active": false,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
