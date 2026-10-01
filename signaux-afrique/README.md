@@ -2,6 +2,12 @@
 
 Un système n8n qui repère chaque jour et chaque mois **ce que le Cameroun, ses voisins et d'autres marchés achètent**. Il t'aide à décider quoi produire, quoi exporter, et pour quels produits te positionner comme apporteur d'affaires. Il range aussi les **contacts** au même endroit (acheteurs publics, plateformes B2B).
 
+Chaque signal arrive avec un **brief** écrit pour ta ferme (18 ha à Douala) :
+
+- **À retenir** : le fait important, en une ou deux phrases, avec le prix en FCFA ;
+- **Que faire** : l'action concrète, qu'il s'agisse de produire, de faire du courtage ou d'attendre ;
+- **Pour ta ferme** : un verdict, par exemple « Projet possible », « Courtage seulement » ou « Plus tard (export) ».
+
 ```
  SOURCES                         n8n                         TOI
  ─────────────────────────       ─────────────────────       ──────────────────────────
@@ -16,8 +22,8 @@ Un système n8n qui repère chaque jour et chaque mois **ce que le Cameroun, ses
 
 | Fichier | Quand | Ce qu'il fait | Où ça va |
 |---|---|---|---|
-| `workflows/1-radar-opportunites.json` | le 1er du mois | Importations de 24 produits agricoles dans 25 pays (Cameroun, CEMAC, Nigeria, Afrique de l'Ouest, Europe, Chine, Émirats…). Il calcule un **score de 0 à 100** pour chaque couple pays + produit. Pour les 15 meilleures pistes (2 pays maximum par produit), il donne **qui fournit aujourd'hui** et la part de l'Afrique et du Cameroun. | onglet `Opportunites` + email |
-| `workflows/2-veille-quotidienne.json` | chaque jour à 7 h | **Appels d'offres** de la Banque mondiale en Afrique (semences, vivres, intrants…), avec **l'organisme acheteur, son email et son téléphone**. Il ajoute les **actualités** sur les pénuries, les interdictions d'export et les flambées de prix. Il ne garde que ce qui touche tes produits (et, pour les actualités, qui parle aussi de commerce), et seulement ce qu'il n'a jamais vu. | onglet `Signaux` + email s'il y a du nouveau |
+| `workflows/1-radar-opportunites.json` | le 1er du mois | Importations de 24 produits agricoles dans 25 pays (Cameroun, CEMAC, Nigeria, Afrique de l'Ouest, Europe, Chine, Émirats…). Il calcule un **score de 0 à 100** pour chaque couple pays + produit. Pour les 15 meilleures pistes (2 pays maximum par produit, 4 marchés hors d'Afrique maximum), il donne **qui fournit aujourd'hui**, la part de l'Afrique et du Cameroun, et **le brief**. | onglet `Opportunites` + email |
+| `workflows/2-veille-quotidienne.json` | chaque jour à 7 h | **Appels d'offres** de la Banque mondiale en Afrique (semences, vivres, intrants…), avec **l'organisme acheteur, son email et son téléphone**. Il ajoute les **actualités** sur les pénuries, les interdictions d'export et les flambées de prix. Il ne garde que ce qui touche tes produits (et, pour les actualités, qui parle aussi de commerce), et seulement ce qu'il n'a jamais vu. Ce qui touche **tes projets** passe en premier, et chaque signal a **son brief**. | onglet `Signaux` + email s'il y a du nouveau |
 | `workflows/3-leads-b2b-email.json` | toutes les heures | Lit les alertes email des plateformes B2B et crée une **fiche contact** : acheteur ou vendeur, produits, pays, quantité, coordonnées, **alerte arnaque**. | onglet `Contacts` |
 
 Les 3 radars ont été testés dans n8n 2.41 avec de vraies données. Voir « Ce qui a été vérifié » plus bas.
@@ -30,12 +36,37 @@ Les 3 radars ont été testés dans n8n 2.41 avec de vraies données. Voir « Ce
 4. **Le nœud « Paramètres »** (radars 1 et 2). Ouvre-le et remplace :
    - `email` : où recevoir les résumés ;
    - `googleSheetUrl` : l'adresse copiée à l'étape 1 ;
-   - dans le radar 1, le `statut` de chaque produit : `'je produis'`, `'je peux produire'`, `'je peux sourcer'` ou `''`. C'est ce qui personnalise le score. Tu peux aussi ajouter des produits (code douanier à 4 ou 6 chiffres) ou des pays (code ONU).
+   - dans le radar 1 :
+     - `ferme` : déjà rempli (Douala, 18 ha, 2 projets cette année) ;
+     - `fcfaParDollar` : le taux du 30/09/2026, à mettre à jour de temps en temps ;
+     - la **fiche de chaque produit**, déjà remplie pour une ferme à Douala. Elle contient : `statut` (ce que tu fais de ce produit), `faisable` (adapté ou non à Douala), `projet` (le projet concret), `delai` (temps avant les premières ventes), `etape` (la prochaine action) et `zone` (d'où viennent les producteurs quand ce n'est pas pour toi). Modifie ces textes : ce sont eux qui écrivent les briefs. Quand tu lances un projet, passe son `statut` à `'je produis'`. Tu peux aussi ajouter des produits (code douanier à 4 ou 6 chiffres) ou des pays (code ONU) ;
+   - dans le radar 2, `mesProjets` : pré-rempli avec la pisciculture et « plantain et palmier à huile ». Remplace-les par tes 2 vrais projets et leurs mots-clés.
 
    Pour le radar 3, colle l'adresse de ta feuille directement dans le nœud *Google Sheets : Contacts*.
 5. **Tester.** Clique sur *Execute workflow*. Le radar 1 prend 2 à 4 minutes, car il laisse 3 secondes entre deux appels pour respecter les limites de l'API gratuite. Ne le relance pas plusieurs fois de suite : voir « Les limites ».
 6. **Activer.** Mets l'interrupteur *Active* en haut à droite. La mémoire « déjà vu » du radar 2 ne marche qu'une fois le workflow activé : pendant les tests, tout apparaît comme nouveau.
 7. **Pour le radar 3.** Inscris-toi gratuitement sur 2 ou 3 plateformes B2B, par exemple Go4WorldBusiness, Tridge, TradeKey, ExportHub ou EC21. Active leurs alertes « buying leads » sur tes produits. Dans Gmail, crée un libellé `leads-b2b` et un filtre qui y range ces emails.
+
+## Lire les briefs
+
+**Radar 1 (chaque mois)**, verdict « Pour ta ferme » :
+
+| Verdict | Ce que ça veut dire |
+|---|---|
+| **Projet possible** | Le Cameroun importe ce produit, et il pousse bien à Douala. Tu peux remplacer une partie de ces importations. Le brief donne le projet, le délai avant les premières ventes, le prix de la concurrence importée en FCFA et la prochaine étape. |
+| **Possible, avec réserves** | Faisable à Douala mais pas idéal (climat, prix, délai). Le brief explique pourquoi et propose une piste de courtage. |
+| **Courtage maintenant, export plus tard** | Un pays voisin importe un produit que tu pourrais produire. Pour l'instant, mets en relation des producteurs camerounais et des importateurs. Plus tard, ce pays sera un débouché pour ta ferme. |
+| **Courtage seulement** | Pas pour ta ferme : climat, ou culture d'une autre région. Tu peux quand même gagner une commission en reliant les producteurs (le brief dit de quelle région) aux acheteurs. |
+| **Plus tard (export)** | Gros marché hors d'Afrique, mais exigeant (normes, certificats). Pas pour démarrer. |
+
+Le prix « à l'arrivée » est le prix moyen payé par l'importateur avant droits de douane et marges. C'est le prix plancher de ta concurrence. Pour gagner, ton coût de revient livré chez l'acheteur doit rester en dessous du prix auquel le produit importé se revend à Douala.
+
+**Radar 2 (chaque jour)** : pour un appel d'offres, le brief dit si tu peux répondre toi-même ou s'il vaut mieux le transmettre à une entreprise contre une commission. Pour une actualité, il dit ce que ça change pour toi :
+
+- une **hausse** ou un **manque** : c'est le moment de vendre ;
+- une **baisse** : prudence avant d'investir dans ce produit ;
+- une **importation** : piste de courtage ;
+- un **simple contexte** : rien à faire.
 
 ## Lire le score du radar 1
 
@@ -80,10 +111,11 @@ Le commerce agricole en ligne attire beaucoup d'arnaques. Le radar 3 signale les
 
 - **ONU Comtrade publie avec 1 à 2 ans de retard**, et certains pays ne déclarent pas ou tardent beaucoup. Lors des tests, il n'y avait aucun chiffre pour le Tchad et la Guinée équatoriale, et pas de chiffres après 2023 pour le Cameroun, le Congo et le Gabon. L'email liste les pays sans chiffres. Pour eux, appuie-toi sur la veille quotidienne et le terrain.
 - Les chiffres officiels ne voient pas le **commerce informel** aux frontières, très important entre le Cameroun, le Nigeria, le Gabon, la Guinée équatoriale, le Tchad et la RCA. C'est le cas de la noix de cola, des tomates, des oignons ou du bétail : le radar 1 les sous-estime, mais la veille et les contacts terrain compensent.
-- La version **gratuite et sans clé** de Comtrade a un **quota d'appels qui se recharge toutes les 10 minutes**. Lors des tests, 40 appels d'affilée sont passés sans refus. Un passage du radar 1 en utilise une vingtaine, donc ça passe. En revanche, si tu le lances 2 ou 3 fois de suite pendant les tests, des requêtes sont refusées. Dans ce cas, l'email l'indique en haut (« requêtes refusées, relance dans 10 minutes ») et certains chiffres manquent ou sont marqués « données anciennes ».
+- La version **gratuite et sans clé** de Comtrade a un **quota d'appels**, rechargé par tranches de 10 minutes, et d'une heure si on fait beaucoup d'appels. Lors des tests, 40 appels d'affilée sont passés sans refus. Un passage du radar 1 en utilise une vingtaine, donc ça passe. En revanche, si tu le lances plusieurs fois de suite pendant les tests, des requêtes sont refusées : le radar réessaie 5 fois, puis continue sans elles. Dans ce cas, l'email l'indique en haut (« requêtes refusées, relance dans 10 minutes ») et certains chiffres manquent ou sont marqués « données anciennes ».
 - Pour suivre beaucoup plus de pays ou de produits, crée une clé gratuite sur comtradedeveloper.un.org et colle-la dans `cleComtrade` (nœud Paramètres). Cette option suit la documentation de Comtrade mais n'a pas pu être testée ici, faute de clé.
 - Les noms des pays fournisseurs (« Brazil », « India »…) sont en anglais, car c'est ainsi que Comtrade les donne.
 - Les flux **Google Actualités** sont prévus pour un usage personnel de veille. Pour une veille plus large, crée des **Google Alertes** avec l'option « Envoyer à : flux RSS » et ajoute leur adresse dans un nœud RSS.
+- **Les briefs sont écrits par des règles** à partir des fiches produits du nœud Paramètres, pas par un agronome. Délais, surfaces et conseils sont des repères généraux pour Douala : fais-les valider sur le terrain (IRAD, délégations du MINADER et du MINEPIA, techniciens, fermes voisines) avant d'investir.
 - **Un signal est une piste, pas une commande.** Le score dit où regarder, pas quoi signer.
 
 ## Aller plus loin
@@ -97,12 +129,12 @@ Le commerce agricole en ligne attire beaucoup d'arnaques. Le radar 3 signale les
 
 Les 3 fichiers ont été importés et lancés dans n8n 2.41.4 le 1er octobre 2026, avec les nœuds Google Sheets et Gmail désactivés, faute d'accès à ton compte Google :
 
-- **Radar 1** : avec un quota neuf, les 22 requêtes Comtrade passent en 4 minutes environ. 548 couples pays + produit sont notés, les fournisseurs du top 15 sont trouvés et l'email est généré. Exemples de pistes sorties :
-  - Cameroun : 167 M$ d'huile de palme importée en 2023 (+39 %/an) ;
-  - Cameroun : 303 M$ de poisson congelé, dont 75 % hors d'Afrique ;
-  - Congo : 250 M$ de volaille, presque rien venant d'Afrique ;
-  - Gabon : 88 M$ de riz, venu presque entièrement d'Asie.
-- **Radar 2** : 29 appels d'offres de la Banque mondiale ouverts en Afrique ont été lus, et 9 recherches d'actualités ont renvoyé 36 articles. Après filtrage, il restait 13 signaux, dont un appel d'offres pour l'achat de denrées alimentaires au Tchad, avec l'email et le téléphone de l'acheteur. La mémoire « déjà vu » marche aussi : au passage suivant, 0 doublon.
+- **Radar 1** : avec un quota neuf, les 22 requêtes Comtrade passent en 4 minutes environ. 548 couples pays + produit sont notés, et le top 15 reçoit ses fournisseurs et son brief. Deux pistes sont classées « Projet possible » pour ta ferme :
+  - **Huile de palme** : 167 M$ importés par le Cameroun en 2023, en hausse de 39 % par an, à environ 710 FCFA/kg à l'arrivée ;
+  - **Poisson congelé** : 303 M$ importés, dont 75 % hors d'Afrique, à environ 745 FCFA/kg.
+
+  Les dernières corrections de texte des briefs ont été vérifiées en rejouant les mêmes données Comtrade.
+- **Radar 2** : 29 appels d'offres de la Banque mondiale ouverts en Afrique ont été lus, et 9 recherches d'actualités ont renvoyé 36 articles. Il est resté 12 signaux, chacun avec son brief, dont 2 sur la filière plantain (tes projets en premier) et un appel d'offres de denrées alimentaires au Tchad. La mémoire « déjà vu » marche : au passage suivant, 0 doublon.
 - **Radar 3** : sur des emails d'exemple, il reconnaît l'acheteur, le produit, le pays, la quantité, l'email et le téléphone, et lève l'alerte arnaque sur « registration fee » et « Western Union ».
 
 Il te reste à brancher ton compte Google et à vérifier que l'écriture dans ta Google Sheet et l'envoi des emails se passent bien.
