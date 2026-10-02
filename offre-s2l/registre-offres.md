@@ -10,14 +10,18 @@ Règles pour remplir le registre :
 
 ## Grille de référence
 
-Établie le 1ᵉʳ octobre 2026 avec le skill `pricing-strategy`. Le détail est dans `offre-s2l/strategie-prix.md`.
+Mise à jour le 2 octobre 2026 (remplace la grille du 1ᵉʳ octobre). Le détail est dans `offre-s2l/strategie-prix.md`.
 
-| Palier | Prix | Mise en place | Engagement |
+| Palier | Prix | Mise en place | Contenu |
 |---|---|---|---|
-| Essentiel | 390 €/mois | 290 € | 3 mois, budget pub d'au moins 300 €/mois |
-| Croissance | 690 €/mois | 590 € | 6 mois |
-| Premium | à partir de 1 190 €/mois | — | après les pilotes |
-| Pilote (2 à 3 clients) | 190 €/mois pendant 3 mois | offerte | puis prix normal, écrit dès le départ |
+| **Tarif fondateur** (3 premiers clients seulement) | 400 à 450 €/mois pendant 3 mois, puis prix normal | offerte | contenu Croissance |
+| Acquisition | 490 €/mois | offerte jusqu'aux preuves, puis payante | pubs Meta, visuels, page d'arrivée, CRM simple |
+| Croissance (Acquisition + S2L) | 690 €/mois | offerte jusqu'aux preuves, puis payante | + rappel en moins d'une minute, tri, RDV dans l'agenda, relances, vidéos |
+| Premium | à partir de 1 190 €/mois | à fixer | + site complet, Google Ads, réseaux sociaux |
+
+- Garantie standard : 3 mois. Objectif chiffré écrit, point de départ mesuré, conditions (budget pub minimum, visuels validés sous 48 h, demandes notées dans le CRM). Si l'objectif n'est pas atteint : on continue sans frais de gestion jusqu'à l'atteindre. Le budget pub reste payé par le client.
+- Frais de mise en place : réintroduits quand on aura 3 clients avec des résultats publiables.
+- Remise standard : 3 mois payés d'avance.
 
 ## Offres faites
 
@@ -25,10 +29,10 @@ Règles pour remplir le registre :
 |---|---|---|---|---|---|---|---|---|---|
 | 01/10/2026 | C'Zen & Belle (Crina) | Esthétique | « Croissance » version C'Zen (pubs Meta + Google, rappel immédiat, fiche Google, rapport) | 400 €/mois, ou 1 050 € pour 3 mois payés d'avance. Version « Essentiel » à 300 €/mois (800 € pour 3 mois). Option relance SMS/WhatsApp : +100 €/mois | Landing page offerte (valeur annoncée : 690 €) | 3 mois, pack payé au démarrage ou mensuel | Au moins autant de demandes qu'avec son agence actuelle après 3 mois, sinon on continue gratuitement | 08/10/2026 | Envoyée (PDF, WhatsApp) : en attente |
 | 01/10/2026 | YLC Esthetic (Esra) | Esthétique | Pubs + rappel des demandes + rappels anti-absence + CRM | 450 €/mois (suggéré à Jay, montant à confirmer) | Mise en place offerte | 3 mois | Objectif de diagnostics honorés, fixé ensemble ; sinon gestion gratuite jusqu'à l'atteindre | — | Intéressée : à confirmer |
-| 02/10/2026 | Jérôme Gourod (SAFTI, Paris 14ᵉ) | Immobilier | Pubs + rappel en moins d'une minute + tri + RDV d'estimation + relances + 4 vidéos et 2 visuels par mois | 690 €/mois, 3 mois payés d'avance (2 070 €). Proposition préparée, pas encore envoyée | Mise en place offerte (son ancienne agence lui a pris 3 000 €). En échange : témoignage, droit d'utiliser ses chiffres, 3 présentations à des collègues SAFTI, accord d'apporteur d'affaires | 3 mois d'avance | RDV d'estimation qualifiés par mois : objectif à fixer lundi | — | RDV démo le 05/10/2026 |
+| 02/10/2026 | Jérôme Gourod (SAFTI, Paris 14ᵉ) | Immobilier | Tarif fondateur, contenu Croissance : pubs, montage de ses vidéos, rappel en moins d'une minute, tri, RDV d'estimation, relances | 450 €/mois pendant 3 mois (1 350 € payés d'avance), puis 690 €/mois. Les clients qu'il recommande : 690 €/mois | Mise en place offerte. En échange : témoignage, droit d'utiliser ses chiffres, recommandation de clients (il s'y est engagé s'il a des résultats) | 3 mois payés d'avance | 3 mois : objectif de RDV d'estimation qualifiés par mois à fixer lundi ; sinon gestion gratuite jusqu'à l'atteindre | — | RDV démo le 05/10/2026 |
 
-## Incohérences à régler
+## Incohérences réglées le 02/10/2026
 
-- Le prix d'entrée en esthétique varie selon l'offre : 300 ou 400 € pour C'Zen, 390 € dans la grille, 450 € suggéré pour Esra.
-- Le nom « Croissance » désigne deux choses : 690 € dans la grille, 400 € chez C'Zen.
-- La garantie se mesure de trois façons différentes : en demandes qualifiées en 60 jours (grille), « autant qu'avant » en 3 mois (C'Zen), en rendez-vous (Esra, Jérôme).
+- Les 3 places « tarif fondateur » : C'Zen & Belle (400 €, offre déjà envoyée, maintenue jusqu'au 08/10), Jérôme (450 €), Esra (450 €, à confirmer). Après 3 mois, tous passent au prix normal, écrit dès le départ dans l'accord.
+- « Croissance » désigne uniquement le palier à 690 €.
+- La garantie se mesure toujours sur 3 mois, avec un objectif chiffré écrit (demandes pour Acquisition, RDV qualifiés pour Croissance).

@@ -2,6 +2,27 @@
 
 Fait avec le skill `pricing-strategy` (`.claude/skills/pricing-strategy/`).
 
+## Mise à jour du 2 octobre 2026 (remplace les paliers et le tarif pilote ci-dessous)
+
+**Une seule agence qui fait tout.** On commence par les pubs pour amener des demandes (l'argent qui rentre), puis on vend le rappel, le tri et les rendez-vous quand le client est débordé. On ne vend pas le S2L seul : travailler avec deux prestataires est trop compliqué à expliquer.
+
+| Palier | Prix | Temps de Jay | Plancher* |
+|---|---|---|---|
+| Tarif fondateur (3 premiers clients) | 400 à 450 €/mois pendant 3 mois, puis prix normal | ~12 h | sous le plancher, accepté (voir plus bas) |
+| Acquisition | 490 €/mois | ~8 h | 457 € |
+| Croissance (Acquisition + S2L) | 690 €/mois | ~11 h | 672 € |
+| Premium | à partir de 1 190 €/mois | ~18 h | 1 075 € |
+
+\* Plancher = (heures × 40 €/h + technique) ÷ (1 − 25,6 %). Jay est en BNC (code APE 6202A), à confirmer sur la déclaration URSSAF.
+
+**Tarif fondateur.** Il est réservé aux 3 premiers clients (C'Zen & Belle, Jérôme, Esra) et dure 3 mois. Il est écrit, et le prix normal qui suit l'est aussi dès le départ. En échange : un témoignage, l'accord d'utiliser leurs chiffres et des recommandations. Exemple, Jérôme à 450 € : 450 × 0,744 − 65 = 270 € par mois, soit environ 22 €/h. C'est un investissement dans la preuve, pas un prix.
+
+**Montée en gamme.** Au bilan du 2ᵉ mois, on montre les demandes perdues ou rappelées tard, puis on propose le S2L (+200 € par mois, soit Acquisition → Croissance).
+
+**Frais de mise en place.** On les réintroduit avec l'abonnement mensuel quand 3 clients auront des résultats publiables.
+
+**Garantie.** 3 mois. Objectif chiffré écrit et point de départ mesuré. Conditions : budget pub minimum, visuels validés sous 48 h, demandes notées dans le CRM. Si l'objectif n'est pas atteint, on continue sans frais de gestion jusqu'à l'atteindre. Pas de remboursement, et le budget pub reste payé par le client.
+
 ## Situation actuelle
 
 Aucun prix n'est fixé. L'ancienne offre (le rappel en moins d'une minute, seul) était présentée à 500 à 1 500 €/mois. Une gérante d'institut l'a refusée à cause du prix et dès qu'on a parlé d'IA.
