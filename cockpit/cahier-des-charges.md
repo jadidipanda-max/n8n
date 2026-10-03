@@ -146,3 +146,41 @@ La simulation est sur 12 mois, de novembre 2026 à octobre 2027. Hypothèses non
 - Ce que Junior doit déclarer au Cameroun pour sa part (à voir de son côté).
 - Faut-il afficher le cash US converti en euros au QG ? Par défaut : taux BCE du jour de chaque paiement.
 - Junior doit-il voir les leads France ? C'est une décision RGPD et de gouvernance. Par défaut, il lit tout et n'écrit que ses lignes.
+
+## 9. Fiscalité : micro ou société (calcul du 3 octobre 2026)
+
+Hypothèses :
+- 10 000 € encaissés par mois pendant 12 mois (120 000 €/an), avec 1 000 €/mois de coûts ;
+- Jay seul, 1 part, sans autre revenu ; barème IR des revenus 2025 (celui de 2026 n'est pas encore voté) ;
+- frais de société (comptable, CFE) : 2 500 €/an.
+
+Le calcul a été refait de façon indépendante par un vérificateur.
+
+| Pour un mois à 10 000 € | Jay | Junior | Total |
+|---|---|---|---|
+| Micro, IR payé par Jay seul | 1 805 € | 3 210 € | 5 015 € |
+| Micro, IR retiré avant le partage | 2 507 € | 2 507 € | 5 015 € |
+| **Micro + versement libératoire, partagé** | **3 100 €** | **3 100 €** | **6 200 €** |
+| SAS sans salaire, dividendes (Jay au PFU 31,4 %) | 2 383 € | 3 029 € | 5 412 € |
+| SAS sans salaire, Jay au barème | 2 762 € | 3 029 € | 5 791 € |
+| SAS, salaire de Jay 2 000 € nets + dividendes | 3 388 € | 1 852 € | 5 240 € |
+
+**Conclusion :** rester en micro en 2026 et 2027, puis passer en SAS au plus tard le 1ᵉʳ janvier 2028.
+- **2026-2027** : la micro s'applique de plein droit l'année de création et la suivante, quel que soit le CA.
+- **1ᵉʳ janvier 2028** : passage obligatoire si le plafond est dépassé en 2026 (au prorata) et en 2027.
+- **Plus tôt, en 2027**, si le versement libératoire est impossible et que les 10 000 €/mois se confirment. Dans ce cas, la SAS laisse plus au total dès environ 62 000 €/an de CA.
+- **Limites de la SAS** : les dividendes ne se versent qu'une fois par an, après l'approbation des comptes, et sans salaire Jay n'a ni retraite ni assurance maladie.
+
+**Urgent :**
+1. **Versement libératoire** : demande possible jusqu'au 30 novembre 2026 (année de création), si le RFR 2024 de Jay est au plus 29 579 € (1 part).
+2. **TVA dès 2026** : les seuils 2026 sont au prorata de la création en août.
+   - Au-delà d'environ 15 700 € de CA France encaissé en 2026, la TVA s'applique au 1ᵉʳ janvier 2027.
+   - Au-delà d'environ 17 300 €, elle est due dès le jour du dépassement.
+   - Ces chiffres valent pour une création le 1ᵉʳ août ; ils sont plus bas si la création est plus tardive.
+   - À prévoir : numéro de TVA intracommunautaire, factures France à 20 %, contrats en « prix HT ».
+3. **Contrat écrit entre Jay et Junior** (sous-traitance ou apport d'affaires), pour encadrer le partage et éviter une « société créée de fait ».
+
+**À faire valider par un expert-comptable :**
+- la retenue sur les sommes versées à Junior (art. 182 B, probablement écartée par la convention France–Cameroun) ;
+- l'impôt de Junior au Cameroun ;
+- le risque d'établissement stable au Cameroun.
