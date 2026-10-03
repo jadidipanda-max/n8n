@@ -1,0 +1,991 @@
+<title>Tour de contrôle J-Square</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+/* Plan : une station par marché (France · QG · USA). Au centre le noyau cash, autour 8 salles reliées par des conduits où circulent les événements. */
+:root{
+  --bg:#ECEFF4;
+  --floor:#E3E8F0;
+  --grid:rgba(40,70,160,.075);
+  --surface:#FFFFFF;
+  --surface-2:#F4F6FA;
+  --ink:#0D1424;
+  --ink-2:#465169;
+  --ink-3:#77829A;
+  --line:#D3DAE5;
+  --accent:#2B55F0;
+  --accent-soft:rgba(43,85,240,.14);
+  --cash:#0B9A55;
+  --cash-soft:rgba(11,154,85,.14);
+  --wait:#D9770F;
+  --wait-soft:rgba(217,119,15,.15);
+  --alert:#D33A2C;
+  --alert-soft:rgba(211,58,44,.12);
+  --idle:#9AA3B5;
+  --shadow:0 1px 0 rgba(13,20,36,.04),0 10px 26px -14px rgba(13,20,36,.22);
+  --ui:'Geist',ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:'Geist Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --r:14px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#070C16;--floor:#0A111E;--grid:rgba(110,140,255,.07);--surface:#0F1829;--surface-2:#0C1423;
+  --ink:#E6EBF5;--ink-2:#A5AFC4;--ink-3:#6F7A92;--line:#213049;--accent:#6E8DFF;--accent-soft:rgba(110,141,255,.18);
+  --cash:#34C784;--cash-soft:rgba(52,199,132,.16);--wait:#F0A04A;--wait-soft:rgba(240,160,74,.16);--alert:#F2675B;--alert-soft:rgba(242,103,91,.16);--idle:#5A657E;
+  --shadow:0 1px 0 rgba(0,0,0,.35),0 12px 30px -14px rgba(0,0,0,.7);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#070C16;--floor:#0A111E;--grid:rgba(110,140,255,.07);--surface:#0F1829;--surface-2:#0C1423;
+  --ink:#E6EBF5;--ink-2:#A5AFC4;--ink-3:#6F7A92;--line:#213049;--accent:#6E8DFF;--accent-soft:rgba(110,141,255,.18);
+  --cash:#34C784;--cash-soft:rgba(52,199,132,.16);--wait:#F0A04A;--wait-soft:rgba(240,160,74,.16);--alert:#F2675B;--alert-soft:rgba(242,103,91,.16);--idle:#5A657E;
+  --shadow:0 1px 0 rgba(0,0,0,.35),0 12px 30px -14px rgba(0,0,0,.7);color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.app{max-width:1480px;margin:0 auto;padding-inline:clamp(16px,2.6vw,32px);padding-block:0 40px}
+
+/* ---------- barre du haut ---------- */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding-block:14px;margin-inline:calc(-1*clamp(16px,2.6vw,32px));padding-inline:clamp(16px,2.6vw,32px);
+  background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto;min-width:0}
+.mark{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--ink);color:var(--bg)}
+.mark svg{width:20px;height:20px}
+.brand-name{font-weight:700;letter-spacing:-.01em;font-size:15px}
+.brand-sub{font-size:12px;color:var(--ink-3);letter-spacing:.04em;text-transform:uppercase}
+.switch{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px;gap:2px;position:relative}
+.switch button{border:0;background:transparent;padding:7px 18px;border-radius:999px;font-weight:500;color:var(--ink-2);cursor:pointer;position:relative;z-index:1;transition:color .25s}
+.switch button[aria-selected="true"]{color:var(--bg)}
+.switch .pill{position:absolute;top:4px;bottom:4px;border-radius:999px;background:var(--ink);transition:left .35s cubic-bezier(.3,.7,.2,1),width .35s cubic-bezier(.3,.7,.2,1)}
+.switch button:focus-visible,.btn:focus-visible,.room:focus-visible,.chip-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top-right{display:flex;align-items:center;gap:10px}
+.demo-badge{font-size:11.5px;color:var(--wait);background:var(--wait-soft);padding:5px 10px;border-radius:999px;font-weight:500;white-space:nowrap}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 12px;font-weight:500;cursor:pointer;transition:border-color .2s,transform .2s}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.small{padding:5px 9px;font-size:12px;border-radius:8px}
+.unread{font-family:var(--mono);font-size:11px;background:var(--wait);color:#fff;border-radius:999px;padding:1px 7px}
+
+/* ---------- en-tête de station ---------- */
+.station-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-block:22px 16px}
+.st-title{font-size:clamp(24px,3vw,32px);font-weight:600;letter-spacing:-.025em;margin:0;text-wrap:balance}
+.st-sub{color:var(--ink-2);margin-top:2px}
+.st-meta{display:flex;gap:8px;flex-wrap:wrap}
+.tag{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);padding:5px 10px;border-radius:999px;white-space:nowrap}
+.tag b{font-family:var(--mono);font-weight:500;color:var(--ink)}
+
+/* ---------- plan de la station ---------- */
+.plan{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.22fr) minmax(0,1fr);
+  grid-template-areas:"a b c" "d core e" "f g h";gap:46px 52px;padding:30px;border-radius:24px;border:1px solid var(--line);
+  background:
+    radial-gradient(ellipse 40% 36% at 50% 50%,var(--cash-soft),transparent 70%),
+    linear-gradient(var(--grid) 1px,transparent 1px) 0 0/28px 28px,
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/28px 28px,
+    var(--floor)}
+.conduits{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;overflow:visible}
+.conduits .base{stroke:var(--line);stroke-width:6;stroke-linecap:round}
+.conduits .flow{stroke-width:2;stroke-linecap:round;stroke-dasharray:3 9;animation:flow 1.1s linear infinite}
+.conduits .flow[data-s="run"],.conduits .flow[data-s="online"]{stroke:var(--accent)}
+.conduits .flow[data-s="wait"]{stroke:var(--wait)}
+.conduits .flow[data-s="ok"]{stroke:var(--cash);animation-duration:2.4s}
+.conduits .flow[data-s="idle"],.conduits .flow[data-s="gate"]{stroke:var(--idle);animation:none;stroke-dasharray:2 7}
+.conduits .port{fill:var(--surface);stroke:var(--line);stroke-width:2}
+.conduits .packet{filter:drop-shadow(0 0 5px currentColor)}
+@keyframes flow{to{stroke-dashoffset:-12}}
+
+/* ---------- salles ---------- */
+.room{position:relative;z-index:2;display:flex;flex-direction:column;gap:12px;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:16px 16px 14px;box-shadow:var(--shadow);cursor:pointer;transition:transform .25s ease,border-color .25s ease,box-shadow .25s}
+.room:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.room::before,.room::after{content:"";position:absolute;width:10px;height:10px;border:1.5px solid var(--ink-3);opacity:.45}
+.room::before{top:6px;left:6px;border-right:0;border-bottom:0;border-top-left-radius:3px}
+.room::after{bottom:6px;right:6px;border-left:0;border-top:0;border-bottom-right-radius:3px}
+.room.flash{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft),var(--shadow)}
+.room.enter{animation:roomIn .55s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--i)*55ms)}
+@keyframes roomIn{from{opacity:.35;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+.room-head{display:flex;align-items:flex-start;gap:10px}
+.ico{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2)}
+.ico svg{width:17px;height:17px}
+.room-title{min-width:0;flex:1}
+.room-name{font-weight:600;letter-spacing:-.01em;font-size:14.5px;line-height:1.2}
+.room-agent{font-size:12px;color:var(--ink-3)}
+.state{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;padding:3px 9px 3px 7px;border-radius:999px;white-space:nowrap;background:var(--surface-2);color:var(--ink-2)}
+.state[data-s="run"],.state[data-s="online"]{background:var(--accent-soft);color:var(--accent)}
+.state[data-s="wait"]{background:var(--wait-soft);color:var(--wait)}
+.state[data-s="ok"]{background:var(--cash-soft);color:var(--cash)}
+.light{width:7px;height:7px;border-radius:50%;background:var(--idle);flex:none}
+.light[data-s="run"],.light[data-s="online"]{background:var(--accent);animation:pulse 1.8s ease-out infinite}
+.light[data-s="wait"]{background:var(--wait);animation:pulseW 1.4s ease-out infinite}
+.light[data-s="ok"]{background:var(--cash)}
+.light[data-s="err"]{background:var(--alert)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 var(--accent-soft)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@keyframes pulseW{0%{box-shadow:0 0 0 0 var(--wait-soft)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.room-body{display:flex;flex-direction:column;gap:10px;min-width:0;flex:1}
+.room-foot{display:flex;justify-content:space-between;gap:10px;align-items:baseline;border-top:1px dashed var(--line);padding-top:10px;font-size:12.5px;color:var(--ink-2)}
+.room-foot q{quotes:"« " " »";min-width:0}
+.room-foot time{font-family:var(--mono);font-size:11px;color:var(--ink-3);white-space:nowrap}
+
+.k{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);font-weight:500}
+.mini{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.mini li{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;align-items:baseline}
+.mini li>span:first-child{color:var(--ink-2);min-width:0}
+.mini li>span:last-child{white-space:nowrap}
+.good{color:var(--cash)}.warn{color:var(--wait)}.bad{color:var(--alert)}
+.bar{height:6px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:999px;background:var(--accent);transition:width .8s cubic-bezier(.2,.7,.2,1)}
+.bar.cash i{background:var(--cash)}
+.gauge-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.gauge-top .v{font-size:13px;font-weight:600}
+.bignum{font-size:26px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1}
+.dots{display:flex;gap:5px}
+.dots i{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--line);background:var(--surface-2)}
+.dots i.on{background:var(--cash);border-color:var(--cash)}
+.track{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.track div{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 7px;min-width:0}
+.track b{display:block;font-family:var(--mono);font-size:16px;font-weight:600}
+.track span{font-size:10.5px;color:var(--ink-3);line-height:1.2;display:block}
+.track .hot{border-color:var(--wait);background:var(--wait-soft)}
+.track .won{border-color:var(--cash);background:var(--cash-soft)}
+.item{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:7px 8px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line);transition:opacity .35s,transform .35s}
+.item.gone{opacity:0;transform:translateX(24px)}
+.item .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip{font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:2px 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.chip.w{background:var(--wait-soft);color:var(--wait)}
+.chip.c{background:var(--cash-soft);color:var(--cash)}
+.chip.g{background:var(--surface);color:var(--ink-2);border:1px solid var(--line)}
+.ok-btn,.no-btn{border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:3px 8px;font-size:11.5px;cursor:pointer;font-weight:500}
+.ok-btn:hover{border-color:var(--cash);color:var(--cash)}
+.no-btn:hover{border-color:var(--alert);color:var(--alert)}
+.verdict{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:15px}
+.verdict .needle{width:22px;height:22px}
+.radar{width:100%;max-width:150px;aspect-ratio:1;margin:2px auto 0;display:block}
+.radar .sweep{transform-origin:60px 60px;animation:spin 5.5s linear infinite}
+.radar .ring{fill:none;stroke:var(--line)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cal{display:flex;flex-direction:column;gap:6px}
+.cal div{display:grid;grid-template-columns:62px minmax(0,1fr);gap:8px;align-items:baseline;font-size:12.5px}
+.cal time{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.cal span{min-width:0}
+.cmp{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:10px;align-items:center;font-size:12px;color:var(--ink-2);margin-bottom:6px}
+.cmp b{font-size:12px;color:var(--ink);font-weight:600}
+.gate-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.gate-stats div{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.gate-stats b{display:block;font-family:var(--mono);font-size:16px;font-weight:600}
+.gate-stats span{font-size:11px;color:var(--ink-3)}
+.enter-link{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--accent);font-size:13px}
+.enter-link svg{width:15px;height:15px;transition:transform .25s}
+.room:hover .enter-link svg{transform:translateX(3px)}
+
+/* ---------- noyau cash ---------- */
+.core{grid-area:core;position:relative;z-index:2;display:flex;flex-direction:column;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);overflow:hidden}
+.core.pulse{animation:corePulse .7s ease-out}
+@keyframes corePulse{0%{box-shadow:0 0 0 0 var(--cash-soft),var(--shadow)}60%{box-shadow:0 0 0 14px transparent,var(--shadow)}100%{box-shadow:var(--shadow)}}
+.core-head{display:flex;align-items:center;justify-content:space-between;gap:8px 10px;padding:14px 16px 0;flex-wrap:wrap}
+.core-head .k{display:flex;align-items:center;gap:8px}
+.seg{display:flex;gap:2px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px}
+.seg button{border:0;background:transparent;font-size:12px;padding:4px 10px;border-radius:999px;color:var(--ink-3);cursor:pointer;font-weight:500}
+.seg button[aria-current="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.slides{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain;flex:1}
+.slides::-webkit-scrollbar{display:none}
+.slide{flex:0 0 100%;scroll-snap-align:start;padding:10px 20px 18px;display:flex;flex-direction:column;align-items:center;gap:10px;min-width:0}
+.ringwrap{position:relative;width:min(250px,72vw);aspect-ratio:1}
+.ringwrap svg{width:100%;height:100%;display:block}
+.ring-bg{fill:none;stroke:var(--surface-2);stroke-width:14}
+.ring-fg{fill:none;stroke:var(--cash);stroke-width:14;stroke-linecap:round;transition:stroke-dashoffset 1.4s cubic-bezier(.2,.7,.2,1)}
+.ticks{transform-origin:130px 130px;animation:spin 90s linear infinite}
+.ticks line{stroke:var(--ink-3);opacity:.35}
+.ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px}
+.ring-center .k{margin-bottom:4px}
+.cash-big{font-size:clamp(30px,3.4vw,40px);font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+.cash-date{font-size:12px;color:var(--ink-3);margin-top:6px}
+.core-line{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.slide-title{align-self:stretch;display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.slide-title .cash-big{font-size:clamp(26px,2.8vw,34px)}
+.chart{width:100%;height:auto;display:block;overflow:visible}
+.chart text{fill:var(--ink-3);font-family:var(--mono);font-size:10px}
+.chart .val{fill:var(--ink);font-size:11px;font-weight:600}
+.chart .gridl{stroke:var(--line);stroke-dasharray:2 4}
+.chart .axis{stroke:var(--line)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2);align-self:stretch}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.meter{align-self:stretch;display:flex;flex-direction:column;gap:6px}
+.meter-bar{position:relative;height:10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line)}
+.meter-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--cash)}
+.meter-bar em{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--wait);border-radius:2px}
+.meter-l{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3);gap:8px}
+.core-nav{display:flex;align-items:center;justify-content:center;gap:12px;padding:0 0 14px}
+.core-nav .arr{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;cursor:pointer}
+.core-nav .arr:disabled{opacity:.35;cursor:default}
+.core-nav .arr svg{width:14px;height:14px}
+.pager{display:flex;gap:6px}
+.pager i{width:7px;height:7px;border-radius:999px;background:var(--line);transition:width .3s,background .3s}
+.pager i.on{width:20px;background:var(--ink)}
+.swipe-hint{font-size:11px;color:var(--ink-3)}
+
+/* ---------- journal ---------- */
+.journal{margin-top:18px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.journal-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+.journal-head span{font-size:11.5px;color:var(--ink-3)}
+.journal ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.journal li{display:grid;grid-template-columns:52px 96px minmax(0,1fr);gap:10px;align-items:baseline;padding:6px 0;border-top:1px solid var(--line);font-size:13px}
+.journal li:first-child{border-top:0}
+.journal li.new{animation:logIn .5s ease-out}
+@keyframes logIn{from{background:var(--accent-soft)}to{background:transparent}}
+.journal time{font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}
+.journal .who{font-size:11.5px;color:var(--ink-2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- panneau latéral (salle ouverte / messagerie) ---------- */
+.scrim{position:fixed;inset:0;background:rgba(5,10,20,.32);z-index:40;animation:fade .25s}
+@keyframes fade{from{opacity:0}}
+.panel{position:fixed;z-index:50;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--surface);border-left:1px solid var(--line);
+  display:flex;flex-direction:column;box-shadow:-20px 0 50px -20px rgba(0,0,0,.35);animation:slideIn .35s cubic-bezier(.2,.7,.2,1);
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@keyframes slideIn{from{transform:translateX(30px);opacity:.4}}
+.panel-head{display:flex;align-items:flex-start;gap:12px;padding:18px 18px 14px;border-bottom:1px solid var(--line)}
+.panel-head h2{margin:0;font-size:18px;letter-spacing:-.015em}
+.panel-head p{margin:2px 0 0;color:var(--ink-3);font-size:12.5px}
+.x{margin-left:auto;width:32px;height:32px;border-radius:9px;border:1px solid var(--line);background:var(--surface);cursor:pointer;display:grid;place-items:center;flex:none}
+.x svg{width:14px;height:14px}
+.panel-body{flex:1;overflow-y:auto;padding:16px 18px 24px;display:flex;flex-direction:column;gap:18px}
+.sec h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);font-weight:600}
+.rows{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.rows>div{display:flex;justify-content:space-between;gap:12px;padding:9px 12px;border-top:1px solid var(--line);font-size:13px;align-items:baseline}
+.rows>div:first-child{border-top:0}
+.rows>div>span:first-child{color:var(--ink-2);min-width:0}
+.rows>div>span:last-child{text-align:right}
+.client{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.client-top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.client-top b{font-size:14px}
+.client-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px;color:var(--ink-2)}
+.client-grid b{display:block;color:var(--ink);font-weight:500;font-family:var(--mono);font-size:12px}
+.auto{display:flex;flex-direction:column;gap:10px}
+.auto-row{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid var(--line);border-radius:12px}
+.auto-row .lbl{font-size:13px;font-weight:500}
+.auto-row .lvl{display:flex;gap:4px;flex-wrap:wrap}
+.chip-btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:11.5px;cursor:pointer;color:var(--ink-2)}
+.chip-btn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.auto-row small{color:var(--ink-3);font-size:11.5px}
+.note{font-size:12px;color:var(--ink-3);background:var(--surface-2);border:1px dashed var(--line);border-radius:10px;padding:9px 11px}
+
+/* messagerie */
+.chat{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:88%;padding:10px 12px;border-radius:14px;font-size:13.5px;line-height:1.5;animation:logIn .5s}
+.msg.h{background:var(--surface-2);border:1px solid var(--line);border-bottom-left-radius:4px;align-self:flex-start}
+.msg.me{background:var(--ink);color:var(--bg);border-bottom-right-radius:4px;align-self:flex-end}
+.msg time{display:block;font-family:var(--mono);font-size:10.5px;opacity:.6;margin-top:4px}
+.msg ul{margin:6px 0 0;padding-left:18px}
+.msg .acts{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.typing{display:inline-flex;gap:4px;padding:12px 14px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--ink-3);animation:blink 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes blink{0%,100%{opacity:.25}50%{opacity:1}}
+.composer{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--line)}
+.composer input{flex:1;min-width:0;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit}
+.composer input:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+.quick{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 4px}
+
+/* ---------- responsive ---------- */
+@media (max-width:1080px){
+  .plan{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"core core" "b g" "a c" "d e" "f h";gap:16px;padding:16px}
+  .conduits{display:none}
+}
+@media (max-width:640px){
+  .plan{grid-template-columns:minmax(0,1fr);grid-template-areas:"core" "b" "g" "a" "c" "d" "e" "f" "h";padding:12px;border-radius:18px}
+  .top{gap:10px}
+  .switch{order:3;width:100%}
+  .switch button{flex:1;padding-inline:8px}
+  .demo-badge{display:none}
+  .journal li{grid-template-columns:44px minmax(0,1fr)}
+  .journal .who{display:none}
+  .core-head{padding:12px 12px 0}
+  .slide{padding-inline:14px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21l1.4-9h3.2L15 21"/><path d="M6.5 12h11"/><path d="M8.2 12l1.1-4.5h5.4l1.1 4.5"/><path d="M12 7.5V3.5"/><path d="M9.5 4.5a3.5 3.5 0 0 1 5 0"/></svg></span>
+      <div><div class="brand-name">J-Square</div><div class="brand-sub">Tour de contrôle</div></div>
+    </div>
+    <nav class="switch" role="tablist" aria-label="Choisir la station">
+      <span class="pill" id="pill" aria-hidden="true"></span>
+      <button role="tab" id="tab-fr" data-st="fr" aria-selected="false">France</button>
+      <button role="tab" id="tab-qg" data-st="qg" aria-selected="true">QG</button>
+      <button role="tab" id="tab-us" data-st="us" aria-selected="false">USA</button>
+    </nav>
+    <div class="top-right">
+      <span class="demo-badge">Maquette · données d'exemple</span>
+      <button class="btn" id="openChat" type="button"><span class="light" data-s="online"></span>Hermès <span class="unread" id="unread">3</span></button>
+    </div>
+  </header>
+
+  <section class="station-head" id="stationHead" aria-live="polite"></section>
+  <section class="plan" id="plan"></section>
+
+  <section class="journal" aria-label="Journal en direct">
+    <div class="journal-head"><strong>Journal en direct</strong><span>Activité simulée pour la maquette</span></div>
+    <ol id="journal"></ol>
+  </section>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="panel" id="panel" role="dialog" aria-labelledby="panelTitle" hidden></aside>
+
+<script>
+(() => {
+'use strict';
+const RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const FX = 0.86; // € pour 1 $, hypothèse de la maquette
+const TODAY_EX = '2026-10-03'; // date des données d'exemple
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = (v, cur = 'EUR') => new Intl.NumberFormat('fr-FR', {style:'currency', currency:cur, currencyDisplay:'narrowSymbol', maximumFractionDigits:0}).format(Math.round(v));
+const toDate = s => new Date(s.length === 10 ? s + 'T12:00' : s); // une date seule se lit à midi, heure locale
+// les rendez-vous s'affichent à l'heure du marché, quel que soit le fuseau de la personne qui regarde
+const day = (iso, tz) => new Intl.DateTimeFormat('fr-FR', {weekday:'short', day:'numeric', month:'short', timeZone:tz}).format(toDate(iso));
+const dayShort = (iso, tz) => new Intl.DateTimeFormat('fr-FR', {day:'numeric', month:'short', timeZone:tz}).format(toDate(iso));
+const hm = (iso, tz) => new Intl.DateTimeFormat('fr-FR', {hour:'2-digit', minute:'2-digit', timeZone:tz}).format(toDate(iso));
+const clock = tz => new Intl.DateTimeFormat('fr-FR', {hour:'2-digit', minute:'2-digit', timeZone:tz}).format(new Date());
+const hourIn = tz => { const p = new Intl.DateTimeFormat('en-GB', {hour:'numeric', minute:'numeric', hourCycle:'h23', timeZone:tz}).formatToParts(new Date()); return +p.find(x => x.type === 'hour').value + (+p.find(x => x.type === 'minute').value) / 60; };
+const nowHM = () => new Intl.DateTimeFormat('fr-FR', {hour:'2-digit', minute:'2-digit'}).format(new Date());
+
+/* ---------- icônes ---------- */
+const I = {
+  hermes:'<path d="M12 21V11"/><path d="M8.5 21h7"/><circle cx="12" cy="8.5" r="2"/><path d="M7.6 4.2a6.2 6.2 0 0 0 0 8.6"/><path d="M16.4 4.2a6.2 6.2 0 0 1 0 8.6"/>',
+  prospect:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r="1"/>',
+  proposals:'<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M9.5 12h6M9.5 15.5h6"/>',
+  finance:'<ellipse cx="12" cy="6.5" rx="7" ry="2.5"/><path d="M5 6.5v5c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-5"/><path d="M5 11.5v5c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-5"/>',
+  clients:'<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/><circle cx="16.5" cy="9.5" r="2.4"/><path d="M15.6 14.6c2.6-.3 4.4 1.1 5 4.4"/>',
+  agenda:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  market:'<path d="M4 20h16"/><path d="M7 16v-4M12 16V7M17 16v-6"/>',
+  approve:'<path d="M4 7l2 2 3-3.5"/><path d="M12 7.5h8"/><path d="M4 15l2 2 3-3.5"/><path d="M12 15.5h8"/>',
+  report:'<circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/>',
+  research:'<circle cx="12" cy="12" r="8.5"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
+  gate:'<rect x="5" y="3.5" width="10" height="17" rx="1"/><path d="M15 6.5l4 1.3v12.7h-4"/><path d="M12 12h.01"/>',
+  agents:'<circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><circle cx="12" cy="12" r="2.2"/><path d="M7.5 7.5l3 3M16.5 7.5l-3 3M7.5 16.5l3-3M16.5 16.5l-3-3"/>',
+  arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>', left:'<path d="M15 5l-7 7 7 7"/>', right:'<path d="M9 5l7 7-7 7"/>', x:'<path d="M6 6l12 12M18 6L6 18"/>'
+};
+const svg = (k, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[k]}</svg>`;
+const STATE_TXT = {run:'En cours', online:'En ligne', wait:'Attend ta décision', idle:'En veille', ok:'À jour', gate:'Station', err:'Erreur'};
+
+/* ---------- données d'exemple ---------- */
+const D = {
+  fr: {
+    key:'fr', cur:'EUR', owner:'Jay', place:'France', tz:'Europe/Paris', clocks:[['Paris','Europe/Paris']], call:[9, 19],
+    cash:2740, objective:7680, signed:2, target:6, mrr:1650, calls:64, callsTarget:100, outreach:14, streak:12,
+    payments:[
+      {d:'2026-10-01', c:'Maison Solène', l:'Essentiel, 3 mois payés d’avance + mise en place', a:1460},
+      {d:'2026-10-02', c:'Atelier Bois & Plan', l:'Croissance, 1er mois + mise en place', a:1280}],
+    expected:[{m:'Nov.', eng:1070, prob:0}, {m:'Déc.', eng:1070, prob:0}, {m:'Janv.', eng:690, prob:1560}],
+    cumulStart:'2026-09-08',
+    steps:[['2026-09-08',570],['2026-09-15',760],['2026-09-24',950],['2026-10-01',2410],['2026-10-02',3690]],
+    screens:[{n:'Écran 1 · pubs Meta', total:323, left:241}, {n:'Écran 2 · Acquisition', total:615, left:615}],
+    pipeline:{demo:3, draft:1, sent:2, won:2, lost:1, lostWhy:'prix'},
+    docs:[
+      {t:'Proposition · Spa Lumen · Essentiel 390 €/mois', s:'wait', l:'Brouillon à relire'},
+      {t:'Relance · Institut Néroli · offre du 29 sept.', s:'run', l:'Prévue demain 9:30'},
+      {t:'Contrat · Atelier Bois & Plan', s:'ok', l:'Signé le 2 oct.'},
+      {t:'Facture 2026-020 · Maison Solène · 1 460 €', s:'ok', l:'Payée'},
+      {t:'Facture 2026-021 · Atelier Bois & Plan · 690 €', s:'wait', l:'À valider'}],
+    clients:[
+      {n:'Institut Aurore', niche:'Esthétique', offer:'Pilote · 190 €/mois', start:'2026-09-08', end:'2026-12-08', goal:'demandes qualifiées', done:21, of:30, next:'2026-10-08T10:00+02:00', paid:570},
+      {n:'Cuisines Delmas', niche:'Cuisiniste', offer:'Pilote · 190 €/mois', start:'2026-09-15', end:'2026-12-15', goal:'RDV en showroom', done:4, of:12, next:'2026-10-15T14:00+02:00', paid:190},
+      {n:'Rivage Immobilier', niche:'Immobilier', offer:'Pilote · 190 €/mois', start:'2026-09-24', end:'2026-12-24', goal:'RDV d’estimation', done:2, of:10, next:'2026-10-23T11:00+02:00', paid:190},
+      {n:'Maison Solène', niche:'Esthétique', offer:'Essentiel · 390 €/mois', start:'2026-10-01', end:'2027-01-01', goal:'demandes qualifiées', done:0, of:25, next:'2026-11-02T10:00+01:00', paid:1460},
+      {n:'Atelier Bois & Plan', niche:'Cuisiniste', offer:'Croissance · 690 €/mois', start:'2026-10-02', end:'2027-04-02', goal:'RDV en showroom', done:0, of:15, next:'2026-11-03T15:00+01:00', paid:1280}],
+    compare:{theirs:450, ours:390, label:'Notre Essentiel'},
+    market:[['Frais d’agence payés aujourd’hui', 'médiane 450 €/mois', '14 réponses'], ['Budget pub', 'médiane 600 €/mois', '11 réponses'], ['Satisfaits de leur prestataire', '4 sur 14', ''], ['Engagement qui finit sous 3 mois', '5 gérants', '']],
+    agenda:[
+      {d:'2026-10-05T10:00+02:00', t:'Démo · Institut Néroli (esthétique, 93)'},
+      {d:'2026-10-06T18:30+02:00', t:'Démo · Cuisines Arlequin'},
+      {d:'2026-10-08T10:00+02:00', t:'Point mensuel · Institut Aurore'},
+      {d:'2026-10-15T14:00+02:00', t:'Point mensuel · Cuisines Delmas'},
+      {d:'2026-10-23T11:00+02:00', t:'Point mensuel · Rivage Immobilier'}],
+    approve:[
+      {id:'a1', type:'Proposition', t:'Spa Lumen · Essentiel 390 €/mois', auto:'Toujours te demander'},
+      {id:'a2', type:'Relance', t:'Institut Néroli · offre sans réponse depuis 3 jours', auto:'Autonome après 5 OK · 3/5'},
+      {id:'a3', type:'Facture', t:'2026-021 · Atelier Bois & Plan · 690 €', auto:'Autonome après 5 OK · 4/5'}]
+  },
+  us: {
+    key:'us', cur:'USD', owner:'Junior', place:'États-Unis', tz:'America/New_York', clocks:[['Tampa','America/New_York'], ['Austin','America/Chicago']], call:[9, 18],
+    cash:997, objective:5960, signed:1, target:6, mrr:497, calls:37, callsTarget:100, outreach:9, streak:5,
+    payments:[{d:'2026-10-01', c:'Glow Aesthetics (Tampa)', l:'Starter, 1er mois + mise en place', a:997}],
+    expected:[{m:'Nov.', eng:497, prob:0}, {m:'Déc.', eng:497, prob:0}, {m:'Janv.', eng:0, prob:497}],
+    cumulStart:'2026-10-01',
+    steps:[['2026-10-01',997]],
+    screens:[{n:'Floride · med spas', total:1000, left:812}, {n:'Texas · med spas', total:1000, left:1000}],
+    pipeline:{demo:2, draft:1, sent:1, won:1, lost:0, lostWhy:''},
+    docs:[
+      {t:'Proposal · Radiance MedSpa (Orlando) · Starter 497 $', s:'wait', l:'Brouillon à relire par Junior'},
+      {t:'Contrat · Glow Aesthetics', s:'ok', l:'Signé le 30 sept.'},
+      {t:'Facture 2026-019 · Glow Aesthetics · 997 $', s:'ok', l:'Payée'}],
+    clients:[
+      {n:'Glow Aesthetics', niche:'Med spa · Tampa, FL', offer:'Starter · 497 $/mois', start:'2026-10-01', end:'2027-01-01', goal:'consultations réservées', done:3, of:24, next:'2026-11-02T11:00-05:00', paid:997}],
+    compare:{theirs:1500, ours:497, label:'Notre Starter'},
+    market:[['Agence actuelle (retainer)', 'médiane 1 500 $/mois', '6 réponses'], ['Budget pub', 'médiane 2 000 $/mois', '5 réponses'], ['Rappellent les leads en moins de 5 min', '1 sur 9', ''], ['Règle d’appel', 'manuel uniquement (TCPA)', '']],
+    agenda:[
+      {d:'2026-10-06T15:00-04:00', tz:'America/New_York', t:'Démo · Radiance MedSpa (Orlando)'},
+      {d:'2026-10-08T15:30-05:00', tz:'America/Chicago', t:'Démo · Lone Star Aesthetics (Austin), heure du Texas'},
+      {d:'2026-11-02T11:00-05:00', t:'Point mensuel · Glow Aesthetics'}],
+    approve:[
+      {id:'u1', type:'Mission Apify', t:'Houston, TX · 500 med spas · environ 2 $', auto:'Toujours demander à Junior'},
+      {id:'u2', type:'Proposition', t:'Radiance MedSpa · Starter 497 $/mois', auto:'Toujours demander à Junior'}]
+  }
+};
+D.qg = {
+  key:'qg', cur:'EUR', place:'Les deux marchés',
+  cash:D.fr.cash + D.us.cash * FX, objective:D.fr.objective + D.us.objective * FX, mrr:D.fr.mrr + D.us.mrr * FX,
+  signed:D.fr.signed + D.us.signed, target:12,
+  expected:D.fr.expected.map((e, i) => ({m:e.m, eng:e.eng + D.us.expected[i].eng * FX, prob:e.prob + D.us.expected[i].prob * FX})),
+  cumulStart:'2026-09-08',
+  steps:(() => { const all = [...D.fr.steps.map((s, i, a) => [s[0], s[1] - (a[i-1] ? a[i-1][1] : 0)]), ...D.us.steps.map((s, i, a) => [s[0], (s[1] - (a[i-1] ? a[i-1][1] : 0)) * FX])].sort((a, b) => a[0] < b[0] ? -1 : 1); let c = 0; return all.map(([d, v]) => [d, c += v]); })(),
+  costs:[['n8n (livraison clients)', 24], ['VPS (Hermès)', 6], ['Crédits API d’Hermès', 38], ['Apify', 5], ['Domaine et e-mails', 8]],
+  thresholds:{tva:37500, micro:77700} // à confirmer par l'agent finance
+};
+const CHAT = [
+  {f:'h', time:'hier 23:00', html:`<b>Rapport du 2 octobre</b><ul><li>France : 83 appels, 47 gérants joints, 2 démos prises.</li><li>USA : 41 appels, 1 démo prise.</li><li>Cash du mois : ${money(D.qg.cash)} (France ${money(D.fr.cash)} · USA ${money(D.us.cash, 'USD')}).</li><li>Verdict : <b>tenir le cap</b>. 12 démos sur les 20 nécessaires pour juger le prix.</li></ul>3 décisions t’attendent.`},
+  {f:'me', time:'hier 23:14', text:'Ok. Relance Néroli demain matin.'},
+  {f:'h', time:'hier 23:14', text:'Noté, relance prévue demain à 9:30. C’est ta 3ᵉ validation sans correction sur ce type de relance : à 5, je les enverrai seul.'},
+  {f:'h', time:'09:12', text:'Paiement reçu : Atelier Bois & Plan, 1 280 €. Ajouté au cash du mois.'}
+];
+const ROOMS = {
+  qg:[
+    {id:'recherche', area:'a', kind:'research', name:'Recherche rentabilité', agent:'Agent researcher', s:'run', said:'Je compare les statuts possibles pour J-Square.', when:'il y a 12 min'},
+    {id:'hermes', area:'b', kind:'hermes', name:'Hermès', agent:'Centre de contrôle', s:'online', said:'Rapport du 2 octobre envoyé à Jay et Junior.', when:'hier 23:02'},
+    {id:'rapport', area:'c', kind:'report', name:'Rapport du soir', agent:'Agent reporter', s:'idle', said:'Je compile les appels, le cash et 3 sources externes.', when:'ce soir 23:00'},
+    {id:'gate-fr', area:'d', kind:'gate', m:'fr', name:'Station France', agent:'Jay', s:'gate'},
+    {id:'gate-us', area:'e', kind:'gate', m:'us', name:'Station USA', agent:'Junior', s:'gate'},
+    {id:'finance', area:'f', kind:'financeQG', name:'Finance', agent:'Agent finance', s:'run', said:'Cash du mois partagé 50/50, avant cotisations.', when:'il y a 3 min'},
+    {id:'valider', area:'g', kind:'approve', name:'À valider', agent:'Toutes les salles', s:'wait', said:'5 décisions en attente, dont 2 pour Junior.', when:'à l’instant'},
+    {id:'agents', area:'h', kind:'agents', name:'État des agents', agent:'6 agents et Hermès', s:'ok', said:'Aucune erreur depuis 3 jours.', when:'il y a 1 min'}],
+  fr:[
+    {id:'prospection', area:'a', kind:'prospect', name:'Prospection', agent:'Agent lead gen', s:'run', said:'856 leads restent à appeler : pas besoin d’en chercher.', when:'il y a 6 min'},
+    {id:'hermes', area:'b', kind:'hermes', name:'Hermès', agent:'Centre de contrôle', s:'online', said:'Paiement Atelier Bois & Plan ajouté au cash.', when:'09:12'},
+    {id:'propositions', area:'c', kind:'proposals', name:'Propositions et contrats', agent:'Agent paperasse', s:'wait', said:'Brouillon Spa Lumen prêt à relire.', when:'il y a 20 min'},
+    {id:'marche', area:'d', kind:'market', name:'Étude de marché', agent:'Agent reporter', s:'ok', said:'La grille reste sous ce qu’ils paient à leur agence.', when:'hier 23:00'},
+    {id:'clients', area:'e', kind:'clients', name:'Clients actifs', agent:'Suivi clients', s:'ok', said:'Institut Aurore : 2 demandes qualifiées de plus.', when:'il y a 41 min'},
+    {id:'finance', area:'f', kind:'finance', name:'Finance', agent:'Agent finance', s:'run', said:'Objectif d’octobre recalculé avec la grille normale.', when:'il y a 3 min'},
+    {id:'valider', area:'g', kind:'approve', name:'À valider', agent:'Décisions de Jay', s:'wait', said:'3 décisions en attente.', when:'à l’instant'},
+    {id:'agenda', area:'h', kind:'agenda', name:'Agenda', agent:'Démos et points mensuels', s:'ok', said:'Point mensuel Aurore booké jeudi 10:00.', when:'hier'}],
+  us:[
+    {id:'prospection', area:'a', kind:'prospect', name:'Prospection', agent:'Agent lead gen', s:'run', said:'1 812 med spas restent à appeler en Floride et au Texas.', when:'il y a 9 min'},
+    {id:'hermes', area:'b', kind:'hermes', name:'Hermès', agent:'Centre de contrôle', s:'online', said:'Point du jour envoyé à Junior.', when:'08:05'},
+    {id:'propositions', area:'c', kind:'proposals', name:'Propositions et contrats', agent:'Agent paperasse', s:'wait', said:'Proposal Radiance MedSpa prête à relire.', when:'il y a 1 h'},
+    {id:'marche', area:'d', kind:'market', name:'Étude de marché', agent:'Agent reporter', s:'ok', said:'Peu de med spas rappellent leurs leads vite.', when:'hier 23:00'},
+    {id:'clients', area:'e', kind:'clients', name:'Clients actifs', agent:'Suivi clients', s:'ok', said:'Glow Aesthetics : 3 consultations réservées.', when:'hier'},
+    {id:'finance', area:'f', kind:'finance', name:'Finance', agent:'Agent finance', s:'run', said:'Objectif d’octobre : 6 med spas signés.', when:'il y a 3 min'},
+    {id:'valider', area:'g', kind:'approve', name:'À valider', agent:'Décisions de Junior', s:'wait', said:'2 décisions en attente.', when:'à l’instant'},
+    {id:'agenda', area:'h', kind:'agenda', name:'Agenda', agent:'Démos et points mensuels', s:'ok', said:'Démo Radiance mardi 15:00, heure de Floride.', when:'hier'}]
+};
+const AGENTS = [
+  {n:'Prospection France', s:'run', w:'Prépare les messages Facebook du jour', c:0.21},
+  {n:'Prospection USA', s:'run', w:'Prépare les messages Facebook du jour', c:0.18},
+  {n:'Finance', s:'run', w:'Recalcule les objectifs du mois', c:0.34},
+  {n:'Propositions et contrats', s:'wait', w:'2 brouillons à relire', c:0.52},
+  {n:'Rapport du soir', s:'idle', w:'Prochain rapport à 23:00', c:0},
+  {n:'Recherche rentabilité', s:'run', w:'Compare les statuts juridiques', c:0.61},
+  {n:'Hermès', s:'online', w:'Centre de contrôle', c:0.94}];
+const AUTONOMY = {
+  prospect:[['Préparer les messages Facebook du jour', 2], ['Lancer une mission de recherche de leads (Apify)', 0]],
+  proposals:[['Préparer un brouillon de proposition', 2], ['Envoyer une proposition au client', 0], ['Relancer une offre sans réponse', 1, '3 validations sans correction sur 5']],
+  finance:[['Préparer une facture', 1, '4 validations sans correction sur 5'], ['Changer un prix de la grille', 0], ['Lancer une alerte de prix plancher', 2]],
+  financeQG:[['Préparer une facture', 1, '4 validations sans correction sur 5'], ['Changer un prix de la grille', 0]],
+  clients:[['Booker le point mensuel dans l’agenda', 2], ['Envoyer le rapport mensuel au client', 1, '1 validation sans correction sur 5']],
+  agenda:[['Booker une démo depuis l’écran d’appel', 2], ['Déplacer un rendez-vous client', 0]],
+  research:[['Chercher et résumer des pistes', 2], ['Changer une offre ou un statut', 0]],
+  report:[['Écrire le rapport du soir', 2], ['Changer de trajectoire', 0]],
+  market:[['Ajouter des sources externes à l’étude', 2]]
+};
+const LEVELS = ['Toujours me demander', 'Autonome après 5 OK', 'Autonome'];
+
+/* ---------- état ---------- */
+let station = 'qg';
+let slide = 0;
+const endpoints = {};
+const done = new Set();
+const unread = {n:3};
+
+/* ---------- rendu des salles ---------- */
+function stationData(k){ return D[k]; }
+function pct(a, b){ return Math.max(0, Math.min(100, b ? a / b * 100 : 0)); }
+
+const BODY = {
+  prospect(m){
+    const left = m.screens.reduce((s, x) => s + x.left, 0);
+    return `<div><div class="gauge-top"><span class="k">Appels aujourd’hui · ${esc(m.owner)}</span><span class="v mono" data-live="calls-${m.key}">${m.calls} / ${m.callsTarget}</span></div>
+      <div class="bar"><i data-live-bar="calls-${m.key}" style="width:${pct(m.calls, m.callsTarget)}%"></i></div></div>
+      <ul class="mini">${m.screens.map(s => `<li><span>${esc(s.n)}</span><span class="mono">${s.left === s.total ? 'pas commencé' : `${s.left} / ${s.total}`}</span></li>`).join('')}
+      <li><span>Outreach Facebook</span><span class="mono good">fait · ${m.outreach} messages</span></li></ul>
+      <div class="k">${left.toLocaleString('fr-FR')} leads à appeler</div>`;
+  },
+  finance(m){
+    return `<div><div class="gauge-top"><span class="k">Signés ce mois</span><span class="v mono">${m.signed} / ${m.target}</span></div>
+      <div class="dots">${Array.from({length:m.target}, (_, i) => `<i class="${i < m.signed ? 'on' : ''}"></i>`).join('')}</div></div>
+      <ul class="mini"><li><span>Objectif du mois</span><span class="mono">${money(m.objective, m.cur)}</span></li>
+      <li><span>Récurrent signé</span><span class="mono">${money(m.mrr, m.cur)}/mois</span></li>
+      <li><span>${m.key === 'fr' ? 'Pilotes 3/3 · grille normale active' : 'Prix US d’exemple'}</span><span class="good">plancher OK</span></li></ul>`;
+  },
+  financeQG(m){
+    const costs = m.costs.reduce((s, c) => s + c[1], 0);
+    return `<ul class="mini"><li><span>Part de Jay (50 %)</span><span class="mono">${money(m.cash / 2)}</span></li>
+      <li><span>Part de Junior (50 %)</span><span class="mono">${money(m.cash / 2)}</span></li>
+      <li><span>Coûts du mois</span><span class="mono bad">− ${money(costs)}</span></li>
+      <li><span>Marge avant cotisations</span><span class="mono good">${money(m.cash - costs)}</span></li></ul>
+      <div class="note">Change 1 $ = ${String(FX).replace('.', ',')} € (hypothèse de la maquette)</div>`;
+  },
+  proposals(m){
+    const p = m.pipeline;
+    return `<div class="track"><div><b>${p.demo}</b><span>démos prévues</span></div><div class="hot"><b>${p.draft}</b><span>à relire</span></div><div><b>${p.sent}</b><span>envoyées</span></div><div class="won"><b>${p.won}</b><span>signées</span></div></div>
+      <ul class="mini">${m.docs.slice(0, 3).map(d => `<li><span>${esc(d.t)}</span><span class="${d.s === 'wait' ? 'warn' : d.s === 'ok' ? 'good' : ''}">${esc(d.l)}</span></li>`).join('')}</ul>`;
+  },
+  market(m){
+    const c = m.compare, max = Math.max(c.theirs, c.ours);
+    return `<div><div class="k" style="margin-bottom:8px">Leur agence aujourd’hui ou notre offre</div>
+      <div class="cmp"><span>Leur agence</span><div class="bar"><i style="width:${pct(c.theirs, max)}%;background:var(--ink-3)"></i></div><b class="mono">${money(c.theirs, m.cur)}</b></div>
+      <div class="cmp"><span>${esc(c.label)}</span><div class="bar cash"><i style="width:${pct(c.ours, max)}%"></i></div><b class="mono">${money(c.ours, m.cur)}</b></div></div>
+      <ul class="mini">${m.market.map(r => `<li><span>${esc(r[0])}</span><span class="mono">${esc(r[1])}</span></li>`).join('')}</ul>`;
+  },
+  clients(m){
+    return `<div class="bignum">${m.clients.length} <span class="k">client${m.clients.length > 1 ? 's' : ''} actif${m.clients.length > 1 ? 's' : ''}</span></div>
+      ${m.clients.slice(0, 3).map(c => `<div><div class="gauge-top"><span style="font-size:12.5px">${esc(c.n)}</span><span class="mono" style="font-size:11.5px;color:var(--ink-3)">${c.done}/${c.of} ${esc(c.goal)}</span></div><div class="bar cash"><i style="width:${pct(c.done, c.of)}%"></i></div></div>`).join('')}
+      ${m.clients.length > 3 ? `<div class="k">+ ${m.clients.length - 3} autres</div>` : ''}`;
+  },
+  approve(m){
+    const items = (m.key === 'qg' ? [...D.fr.approve.map(a => ({...a, m:'fr'})), ...D.us.approve.map(a => ({...a, m:'us'}))] : m.approve.map(a => ({...a, m:m.key}))).filter(a => !done.has(a.id));
+    if (!items.length) return `<div class="note">Rien à valider. Les agents travaillent seuls.</div>`;
+    return `<div class="bignum mono">${items.length} <span class="k">en attente</span></div>
+      ${items.slice(0, 3).map(a => `<div class="item" data-item="${a.id}"><span class="chip ${a.m === 'us' ? 'g' : 'w'}">${esc(a.type)}</span><span class="t" title="${esc(a.t)}">${esc(a.t)}</span><button class="ok-btn" data-ok="${a.id}" type="button">OK</button><button class="no-btn" data-no="${a.id}" type="button" aria-label="Refuser">Non</button></div>`).join('')}
+      ${items.length > 3 ? `<div class="k">+ ${items.length - 3} autre${items.length > 4 ? 's' : ''} dans la file</div>` : ''}`;
+  },
+  agenda(m){
+    return `<div class="cal">${m.agenda.slice(0, 4).map(e => `<div><time>${esc(dayShort(e.d, e.tz || m.tz))} ${esc(hm(e.d, e.tz || m.tz))}</time><span>${esc(e.t)}</span></div>`).join('')}</div>`;
+  },
+  hermes(m){
+    const dots = [0, 52, 118, 170, 230, 300].map((a, i) => { const r = [42, 30, 46, 22, 36, 48][i]; const x = 60 + r * Math.cos(a * Math.PI / 180), y = 60 + r * Math.sin(a * Math.PI / 180); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="${i === 3 ? 'var(--wait)' : 'var(--accent)'}"/>`; }).join('');
+    return `<svg class="radar" viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="sw" x1="0" x2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity="0"/><stop offset="1" stop-color="var(--accent)" stop-opacity=".35"/></linearGradient></defs>
+      <circle class="ring" cx="60" cy="60" r="52"/><circle class="ring" cx="60" cy="60" r="34"/><circle class="ring" cx="60" cy="60" r="16"/>
+      <g class="sweep"><path d="M60 60 L112 60 A52 52 0 0 0 96.8 23.2 Z" fill="url(#sw)"/></g>${dots}<circle cx="60" cy="60" r="5" fill="var(--ink)"/></svg>
+      <ul class="mini"><li><span>Agents suivis</span><span class="mono">6</span></li><li><span>Décisions en attente</span><span class="mono warn" data-live="pending">${pendingCount()}</span></li></ul>`;
+  },
+  report(m){
+    return `<div class="verdict"><svg class="needle" viewBox="0 0 24 24" fill="none" stroke="var(--cash)" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 12l4-6"/></svg>Tenir le cap</div>
+      <ul class="mini"><li><span>Échantillon pour juger le prix</span><span class="mono">12 / 20 démos</span></li><li><span>Signature après démo</span><span class="mono">25 %</span></li><li><span>Prochain rapport</span><span class="mono" data-live="countdown">${countdown()}</span></li></ul>`;
+  },
+  research(m){
+    return `<ul class="mini"><li><span><span class="chip w">Structure</span> Tout passe par la micro de Jay</span><span class="warn">à voir</span></li>
+      <li><span><span class="chip">Embauche</span> Setter quand les appels dépassent 100/jour</span><span></span></li>
+      <li><span><span class="chip">Offre</span> Tarif annuel avec 2 mois offerts</span><span></span></li></ul>`;
+  },
+  agents(m){
+    return `<ul class="mini">${AGENTS.map(a => `<li><span style="display:flex;align-items:center;gap:8px"><span class="light" data-s="${a.s}"></span>${esc(a.n)}</span><span class="mono" style="color:var(--ink-3)">${a.c ? a.c.toFixed(2).replace('.', ',') + ' €' : '—'}</span></li>`).join('')}</ul>`;
+  },
+  gate(m){
+    const t = D[m.m];
+    return `<div class="gate-stats"><div><b>${money(t.cash, t.cur)}</b><span>cash du mois</span></div><div><b>${t.clients.length}</b><span>clients actifs</span></div>
+      <div><b data-live="calls-${t.key}">${t.calls} / ${t.callsTarget}</b><span>appels aujourd’hui</span></div><div><b>${t.signed} / ${t.target}</b><span>signés ce mois</span></div></div>
+      <ul class="mini"><li><span>Prochaine démo</span><span class="mono">${(e => esc(day(e.d, e.tz || t.tz) + ' ' + hm(e.d, e.tz || t.tz)))(t.agenda.find(e => e.t.startsWith('Démo')))}</span></li>
+      <li><span>Décisions en attente</span><span class="mono warn" data-live="pending-${t.key}">${t.approve.filter(a => !done.has(a.id)).length}</span></li>
+      <li><span>Leads à appeler</span><span class="mono">${t.screens.reduce((a, x) => a + x.left, 0).toLocaleString('fr-FR')}</span></li></ul>
+      <div class="room-foot"><q>${esc(t.key === 'fr' ? 'Démo Institut Néroli lundi 10:00.' : 'Démo Radiance MedSpa mardi, 15:00 heure de Floride.')}</q><span class="enter-link">Entrer ${svg('arrow')}</span></div>`;
+  }
+};
+
+function pendingCount(){ return [...D.fr.approve, ...D.us.approve].filter(a => !done.has(a.id)).length; }
+function countdown(){
+  const h = hourIn('Europe/Paris'); let d = 23 - h; if (d <= 0) d += 24;
+  const hh = Math.floor(d), mm = Math.round((d - hh) * 60);
+  return `dans ${hh} h ${String(mm === 60 ? 0 : mm).padStart(2, '0')}`;
+}
+
+function roomHTML(r, i, m){
+  const foot = r.kind === 'gate' ? '' : `<div class="room-foot"><q>${esc(r.said)}</q><time>${esc(r.when)}</time></div>`;
+  const state = r.kind === 'gate'
+    ? `<span class="state"><span class="mono">${esc(D[r.m].clocks.map(c => `${c[0]} ${clock(c[1])}`).join(' · '))}</span></span>`
+    : `<span class="state" data-s="${r.s}"><span class="light" data-s="${r.s}"></span>${STATE_TXT[r.s]}</span>`;
+  return `<article class="room${RM ? '' : ' enter'}" style="grid-area:${r.area};--i:${i}" data-room="${r.id}" data-kind="${r.kind}" tabindex="0" aria-label="${esc(r.name)}">
+    <div class="room-head"><span class="ico">${svg(r.kind === 'financeQG' ? 'finance' : r.kind)}</span><div class="room-title"><div class="room-name">${esc(r.name)}</div><div class="room-agent">${esc(r.agent)}</div></div>${state}</div>
+    <div class="room-body">${BODY[r.kind](r.kind === 'gate' ? r : m)}</div>${foot}</article>`;
+}
+
+/* ---------- noyau cash ---------- */
+function coreHTML(m){
+  const cur = m.cur, C = 2 * Math.PI * 104;
+  const monthName = new Intl.DateTimeFormat('fr-FR', {month:'long', year:'numeric'}).format(new Date());
+  const split = m.key === 'qg' ? `<span class="tag">France <b>${money(D.fr.cash)}</b></span><span class="tag">USA <b>${money(D.us.cash, 'USD')}</b></span>` : `<span class="tag">Signés ce mois <b>${m.signed} / ${m.target}</b></span>`;
+  const ticks = Array.from({length:72}, (_, i) => { const a = i * 5 * Math.PI / 180, r1 = 124, r2 = i % 6 ? 120 : 116; return `<line x1="${(130 + r1 * Math.cos(a)).toFixed(1)}" y1="${(130 + r1 * Math.sin(a)).toFixed(1)}" x2="${(130 + r2 * Math.cos(a)).toFixed(1)}" y2="${(130 + r2 * Math.sin(a)).toFixed(1)}"/>`; }).join('');
+  const p = pct(m.cash, m.objective);
+  return `<div class="core" id="core" style="grid-area:core">
+    <div class="core-head"><span class="k"><span class="light" data-s="ok"></span>Cash <span class="core-scope">${m.key === 'qg' ? '· deux marchés' : m.key === 'fr' ? '· France' : '· USA'}</span></span>
+      <div class="seg" role="group" aria-label="Vue du cash"><button type="button" data-go="0" aria-current="true">Mois</button><button type="button" data-go="1">Récurrent</button><button type="button" data-go="2">Cumul</button></div></div>
+    <div class="slides" id="slides">
+      <section class="slide" aria-label="Cash collecté ce mois">
+        <div class="ringwrap"><svg viewBox="0 0 260 260"><g class="ticks">${ticks}</g><circle class="ring-bg" cx="130" cy="130" r="104"/>
+          <circle class="ring-fg" id="ringFg" cx="130" cy="130" r="104" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}" transform="rotate(-90 130 130)" data-target="${(C * (1 - p / 100)).toFixed(1)}"/></svg>
+          <div class="ring-center"><span class="k">Cash collecté</span><span class="cash-big" id="cashBig" data-v="${m.cash}" data-cur="${cur}">${money(m.cash, cur)}</span><span class="cash-date">depuis le 1ᵉʳ ${esc(monthName)}</span></div></div>
+        <div class="core-line"><span class="tag">Objectif <b>${money(m.objective, cur)}</b></span><span class="tag">Atteint <b>${Math.round(p)} %</b></span>${split}</div>
+      </section>
+      <section class="slide" aria-label="Récurrent et attendu">
+        <div class="slide-title"><div><div class="k">Récurrent signé</div><div class="cash-big">${money(m.mrr, cur)}<span class="k"> /mois</span></div></div><span class="tag">Engagements de 3 mois</span></div>
+        ${barsSVG(m)}
+        <div class="legend"><span><i style="background:var(--cash)"></i>Déjà engagé</span><span><i style="background:repeating-linear-gradient(45deg,var(--cash) 0 2px,transparent 2px 5px);border:1px solid var(--cash)"></i>Probable si le client renouvelle</span></div>
+      </section>
+      <section class="slide" aria-label="Cumul depuis le début">
+        <div class="slide-title"><div><div class="k">Cumul depuis le début</div><div class="cash-big">${money(m.steps[m.steps.length - 1][1], cur)}</div></div><span class="tag">depuis le ${esc(dayShort(m.cumulStart))}</span></div>
+        ${stepSVG(m)}
+        ${m.key === 'qg' ? meterHTML(m) : `<div class="note">${m.key === 'fr' ? 'Part de la France' : 'Part des USA'} dans le total : ${Math.round((m.key === 'fr' ? D.fr.steps.at(-1)[1] : D.us.steps.at(-1)[1] * FX) / D.qg.steps.at(-1)[1] * 100)} %</div>`}
+      </section>
+    </div>
+    <div class="core-nav"><button class="arr" type="button" data-step="-1" aria-label="Vue précédente">${svg('left')}</button><div class="pager" aria-hidden="true"><i class="on"></i><i></i><i></i></div><button class="arr" type="button" data-step="1" aria-label="Vue suivante">${svg('right')}</button></div>
+  </div>`;
+}
+
+function barsSVG(m){
+  const W = 320, H = 170, top = 26, bot = 24, max = Math.max(...m.expected.map(e => e.eng + e.prob)) || 1;
+  const sc = v => (H - top - bot) * v / max, bw = 58, gapX = (W - 3 * bw) / 4;
+  const bars = m.expected.map((e, i) => {
+    const x = gapX + i * (bw + gapX), he = sc(e.eng), hp = sc(e.prob), yE = H - bot - he, yP = yE - hp;
+    return `${e.eng ? `<rect x="${x}" y="${yE}" width="${bw}" height="${he}" rx="5" fill="var(--cash)"/>` : ''}
+      ${e.prob ? `<rect x="${x + .75}" y="${yP + .75}" width="${bw - 1.5}" height="${Math.max(hp - 1.5, 0)}" rx="5" fill="url(#hatch-${m.key})" stroke="var(--cash)" stroke-width="1.5"/>` : ''}
+      <text class="val" x="${x + bw / 2}" y="${yP - 7}" text-anchor="middle">${esc(money(e.eng + e.prob, m.cur))}</text>
+      <text x="${x + bw / 2}" y="${H - 7}" text-anchor="middle">${esc(e.m)}</text>`;
+  }).join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Cash attendu sur les 3 prochains mois"><defs><pattern id="hatch-${m.key}" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="5" fill="var(--cash)" opacity=".55"/></pattern></defs>
+    <line class="axis" x1="0" x2="${W}" y1="${H - bot}" y2="${H - bot}"/>${bars}</svg>`;
+}
+
+function stepSVG(m){
+  const W = 320, H = 150, L = 40, R = 12, T = 14, B = 22;
+  const t0 = toDate(m.cumulStart).getTime() - 86400000 * .5, t1 = toDate(TODAY_EX).getTime() + 86400000 * .5;
+  const vmax = m.steps.at(-1)[1], nice = niceMax(vmax * 1.12);
+  const x = t => L + (W - L - R) * (t - t0) / (t1 - t0), y = v => H - B - (H - T - B) * v / nice;
+  let d = `M${x(t0)} ${y(0)}`, prev = 0;
+  m.steps.forEach(([ds, v]) => { const xx = x(toDate(ds).getTime()); d += ` L${xx.toFixed(1)} ${y(prev).toFixed(1)} L${xx.toFixed(1)} ${y(v).toFixed(1)}`; prev = v; });
+  d += ` L${x(t1).toFixed(1)} ${y(prev).toFixed(1)}`;
+  const area = d + ` L${x(t1).toFixed(1)} ${y(0)} Z`;
+  const grid = [nice / 2, nice].map(v => `<line class="gridl" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 3}" text-anchor="end">${esc(short(v, m.cur))}</text>`).join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Cash cumulé depuis le début">${grid}
+    <line class="axis" x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}"/><text x="${L - 6}" y="${y(0) + 3}" text-anchor="end">0</text>
+    <path d="${area}" fill="var(--cash-soft)"/><path d="${d}" fill="none" stroke="var(--cash)" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="${x(t1)}" cy="${y(prev)}" r="4.5" fill="var(--cash)" stroke="var(--surface)" stroke-width="2"/>
+    <text x="${L}" y="${H - 6}">${esc(dayShort(m.cumulStart))}</text><text x="${W - R}" y="${H - 6}" text-anchor="end">aujourd’hui</text></svg>`;
+}
+function niceMax(v){ const p = Math.pow(10, Math.floor(Math.log10(v))); for (const k of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (k * p >= v) return k * p; return 10 * p; }
+function short(v, cur){ const s = cur === 'USD' ? ' $' : ' €'; return v >= 1000 ? (v / 1000).toLocaleString('fr-FR', {maximumFractionDigits:1}) + ' k' + s : Math.round(v) + s; }
+function meterHTML(m){
+  const ca = m.steps.at(-1)[1], th = m.thresholds, max = th.micro;
+  return `<div class="meter"><div class="meter-l"><span>Chiffre d’affaires 2026 de la micro de Jay</span><span class="mono">${money(ca)}</span></div>
+    <div class="meter-bar"><i style="width:${pct(ca, max)}%"></i><em style="left:${pct(th.tva, max)}%"></em></div>
+    <div class="meter-l"><span>Seuil de TVA ${money(th.tva)}</span><span>Plafond micro ${money(th.micro)}</span></div></div>`;
+}
+
+/* ---------- station ---------- */
+function headHTML(k){
+  const m = D[k];
+  if (k === 'qg') return `<div><h1 class="st-title">QG · les deux marchés</h1><div class="st-sub">Le cash total au centre. Entre dans une station pour ne voir que son marché.</div></div>
+    <div class="st-meta"><span class="tag">Paris <b>${clock('Europe/Paris')}</b></span><span class="tag">Tampa <b>${clock('America/New_York')}</b></span><span class="tag">Austin <b>${clock('America/Chicago')}</b></span><span class="tag">Rapport du soir <b data-live="countdown">${countdown()}</b></span></div>`;
+  const open = m.clocks.some(c => { const h = hourIn(c[1]); return h >= m.call[0] && h < m.call[1]; });
+  return `<div><h1 class="st-title">Station ${esc(m.place === 'France' ? 'France' : 'USA')}</h1><div class="st-sub">${esc(m.owner)} · ${k === 'fr' ? 'esthétique, immobilier, cuisinistes' : 'med spas en Floride et au Texas'}</div></div>
+    <div class="st-meta">${m.clocks.map(c => `<span class="tag">${esc(c[0])} <b>${clock(c[1])}</b></span>`).join('')}<span class="tag"><span class="light" data-s="${open ? 'run' : 'idle'}"></span>${open ? 'Créneau d’appel ouvert' : 'Créneau d’appel fermé'} (${m.call[0]} h – ${m.call[1]} h)</span></div>`;
+}
+
+function render(k, opts = {}){
+  station = k; slide = 0;
+  document.querySelectorAll('.switch button').forEach(b => b.setAttribute('aria-selected', b.dataset.st === k ? 'true' : 'false'));
+  movePill();
+  $('#stationHead').innerHTML = headHTML(k);
+  const m = D[k];
+  $('#plan').innerHTML = `<svg class="conduits" id="conduits" aria-hidden="true"></svg>` + ROOMS[k].map((r, i) => roomHTML(r, i, m)).join('') + coreHTML(m);
+  renderJournal();
+  requestAnimationFrame(() => {
+    const fg = $('#ringFg'); if (fg) fg.style.strokeDashoffset = fg.dataset.target;
+    countUp($('#cashBig'));
+    drawConduits();
+  });
+  if (!opts.keepHash) { try { history.replaceState(null, '', '#' + k); } catch (e) {} }
+}
+
+function movePill(){
+  const b = document.querySelector('.switch button[aria-selected="true"]'), pill = $('#pill');
+  if (!b || !pill) return;
+  pill.style.left = b.offsetLeft + 'px'; pill.style.width = b.offsetWidth + 'px';
+}
+
+function countUp(el){
+  if (!el) return;
+  const v = +el.dataset.v, cur = el.dataset.cur;
+  if (RM) { el.textContent = money(v, cur); return; }
+  const t0 = performance.now(), dur = 1100;
+  const tick = t => { const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3); el.textContent = money(v * e, cur); if (p < 1) requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+}
+
+/* ---------- conduits ---------- */
+const wide = window.matchMedia('(min-width: 1081px)');
+function edgePoint(cx, cy, hw, hh, dx, dy){
+  const t = Math.min(dx ? hw / Math.abs(dx) : Infinity, dy ? hh / Math.abs(dy) : Infinity);
+  return [cx + dx * t, cy + dy * t];
+}
+function drawConduits(){
+  const svgEl = $('#conduits'), plan = $('#plan'), core = $('#core');
+  if (!svgEl || !core) return;
+  svgEl.innerHTML = '';
+  for (const k in endpoints) delete endpoints[k];
+  if (!wide.matches) return;
+  const pr = plan.getBoundingClientRect(), cr = core.getBoundingClientRect();
+  const ccx = cr.left - pr.left + cr.width / 2, ccy = cr.top - pr.top + cr.height / 2;
+  svgEl.setAttribute('viewBox', `0 0 ${pr.width} ${pr.height}`);
+  let out = '';
+  plan.querySelectorAll('.room').forEach(el => {
+    const r = el.getBoundingClientRect(), rx = r.left - pr.left + r.width / 2, ry = r.top - pr.top + r.height / 2;
+    const dx = ccx - rx, dy = ccy - ry;
+    const [x1, y1] = edgePoint(rx, ry, r.width / 2, r.height / 2, dx, dy);
+    const [x2, y2] = edgePoint(ccx, ccy, cr.width / 2, cr.height / 2, -dx, -dy);
+    const id = el.dataset.room, spec = ROOMS[station].find(x => x.id === id), s = spec.s;
+    endpoints[id] = [x1, y1, x2, y2, s];
+    out += `<line class="base" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/><line class="flow" data-s="${s}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/><circle class="port" cx="${x1}" cy="${y1}" r="4"/><circle class="port" cx="${x2}" cy="${y2}" r="4"/>`;
+  });
+  svgEl.innerHTML = out;
+}
+function packet(roomId, color = 'var(--accent)'){
+  const e = endpoints[roomId], svgEl = $('#conduits');
+  const room = document.querySelector(`.room[data-room="${roomId}"]`);
+  if (room) { room.classList.add('flash'); setTimeout(() => room.classList.remove('flash'), 900); }
+  if (!e || !svgEl || RM) return;
+  const NS = 'http://www.w3.org/2000/svg', c = document.createElementNS(NS, 'circle');
+  c.setAttribute('r', '5'); c.setAttribute('class', 'packet'); c.style.fill = color; c.style.color = color;
+  svgEl.appendChild(c);
+  const [x1, y1, x2, y2] = e, t0 = performance.now(), dur = 1000;
+  const step = t => { const p = Math.min(1, (t - t0) / dur), q = p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+    c.setAttribute('cx', x1 + (x2 - x1) * q); c.setAttribute('cy', y1 + (y2 - y1) * q);
+    if (p < 1) requestAnimationFrame(step); else { c.remove(); const core = $('#core'); if (core) { core.classList.remove('pulse'); void core.offsetWidth; core.classList.add('pulse'); } } };
+  requestAnimationFrame(step);
+}
+
+/* ---------- carrousel du cash ---------- */
+function goSlide(i){
+  const sl = $('#slides'); if (!sl) return;
+  slide = Math.max(0, Math.min(2, i));
+  sl.scrollTo({left:slide * sl.clientWidth, behavior:RM ? 'auto' : 'smooth'});
+  syncPager();
+}
+function syncPager(){
+  document.querySelectorAll('.pager i').forEach((d, j) => d.classList.toggle('on', j === slide));
+  document.querySelectorAll('.seg button').forEach((b, j) => b.setAttribute('aria-current', j === slide ? 'true' : 'false'));
+  const [prev, next] = document.querySelectorAll('.core-nav .arr');
+  if (prev) prev.disabled = slide === 0; if (next) next.disabled = slide === 2;
+}
+
+/* ---------- journal ---------- */
+const LOG = [
+  {m:'fr', room:'prospection', who:'Prospection', t:'Appel passé à un institut du 93 : rappel demandé mardi.'},
+  {m:'all', room:'hermes', who:'Hermès', t:'Point de 14 h envoyé à Jay et Junior.'},
+  {m:'us', room:'prospection', who:'Prospection USA', t:'Junior a joint un med spa à Orlando : démo jeudi.'},
+  {m:'fr', room:'clients', who:'Clients actifs', t:'Institut Aurore : 1 demande qualifiée de plus.'},
+  {m:'all', room:'recherche', who:'Recherche', t:'Nouvelle piste : tarif annuel avec 2 mois offerts.'},
+  {m:'fr', room:'propositions', who:'Paperasse', t:'Brouillon Spa Lumen mis à jour avec la garantie.'},
+  {m:'us', room:'clients', who:'Clients actifs', t:'Glow Aesthetics : 1 consultation réservée.'},
+  {m:'all', room:'finance', who:'Finance', t:'Coût des agents aujourd’hui : 2,80 €.'}
+];
+const journal = [
+  {time:'14:02', m:'fr', who:'Finance', t:'Objectif d’octobre recalculé : 6 clients, ' + money(D.fr.objective) + '.'},
+  {time:'13:48', m:'fr', who:'Paperasse', t:'Brouillon Spa Lumen prêt à relire.'},
+  {time:'13:30', m:'us', who:'Prospection USA', t:'Floride : 188 med spas appelés sur 1 000.'},
+  {time:'09:12', m:'all', who:'Hermès', t:'Paiement reçu : Atelier Bois & Plan, 1 280 €.'}
+];
+function renderJournal(fresh){
+  const rows = journal.filter(j => station === 'qg' || j.m === station || j.m === 'all').slice(0, 6);
+  $('#journal').innerHTML = rows.map((j, i) => `<li class="${fresh && i === 0 ? 'new' : ''}"><time>${esc(j.time)}</time><span class="who">${esc(j.who)}${j.m !== 'all' && station === 'qg' ? (j.m === 'fr' ? ' · FR' : ' · US') : ''}</span><span>${esc(j.t)}</span></li>`).join('');
+}
+let li = 0;
+function simulate(){
+  const ev = LOG[li++ % LOG.length];
+  if (ev.room === 'prospection') {
+    const t = D[ev.m]; if (t.calls < t.callsTarget) t.calls++;
+    document.querySelectorAll(`[data-live="calls-${ev.m}"]`).forEach(el => el.textContent = `${t.calls} / ${t.callsTarget}`);
+    document.querySelectorAll(`[data-live-bar="calls-${ev.m}"]`).forEach(el => el.style.width = pct(t.calls, t.callsTarget) + '%');
+  }
+  journal.unshift({time:nowHM(), m:ev.m, who:ev.who, t:ev.t}); journal.length = Math.min(journal.length, 30);
+  const visible = station === 'qg' || ev.m === station || ev.m === 'all';
+  if (visible) {
+    renderJournal(true);
+    let target = ev.room;
+    if (station === 'qg' && ev.m !== 'all') target = ev.room === 'prospection' || ev.room === 'clients' ? 'gate-' + ev.m : ev.room;
+    if (station !== 'qg' && !ROOMS[station].some(r => r.id === target)) target = 'hermes';
+    packet(target, ev.room === 'clients' || ev.room === 'finance' ? 'var(--cash)' : 'var(--accent)');
+  }
+}
+
+/* ---------- panneau : salle ouverte ---------- */
+function openPanel(html){
+  const p = $('#panel'); p.innerHTML = html; p.hidden = false; $('#scrim').hidden = false;
+  const x = p.querySelector('.x'); if (x) x.focus();
+}
+function closePanel(){ $('#panel').hidden = true; $('#scrim').hidden = true; }
+
+function roomPanel(id){
+  const spec = ROOMS[station].find(r => r.id === id); if (!spec) return;
+  if (spec.kind === 'gate') { render(spec.m); window.scrollTo({top:0, behavior:RM ? 'auto' : 'smooth'}); return; }
+  if (spec.kind === 'hermes') { chatPanel(); return; }
+  const m = D[station];
+  let body = '';
+  const sec = (t, h) => `<div class="sec"><h3>${t}</h3>${h}</div>`;
+  const rows = arr => `<div class="rows">${arr.map(r => `<div><span>${r[0]}</span><span>${r[1]}</span></div>`).join('')}</div>`;
+  switch (spec.kind) {
+    case 'prospect':
+      body = sec('Écrans d’appel', rows(m.screens.map(s => [esc(s.n), `<span class="mono">${s.left} à appeler sur ${s.total}</span>`])))
+        + sec('Aujourd’hui', rows([['Appels', `<span class="mono">${m.calls} / ${m.callsTarget}</span>`], ['Outreach Facebook', `<span class="good">fait · ${m.outreach} messages</span>`], ['Jours d’affilée', `<span class="mono">${m.streak}</span>`]]))
+        + `<div class="note">L’agent ne cherche de nouvelles leads que sur ta demande. Chaque mission Apify passe par la file « À valider ».</div>`;
+      break;
+    case 'finance':
+      body = sec('Encaissé ce mois', rows(m.payments.map(p => [`${esc(dayShort(p.d))} · ${esc(p.c)}<br><small style="color:var(--ink-3)">${esc(p.l)}</small>`, `<span class="mono">${money(p.a, m.cur)}</span>`])))
+        + sec('Objectif du mois', rows([['Nouveaux clients', `<span class="mono">${m.signed} / ${m.target}</span>`], ['Cash visé', `<span class="mono">${money(m.objective, m.cur)}</span>`], ['Récurrent signé', `<span class="mono">${money(m.mrr, m.cur)}/mois</span>`]]))
+        + `<div class="note">${m.key === 'fr' ? 'Les 3 pilotes sont signés : toute nouvelle offre part de la grille 390 / 690 / 1 190 €. L’alerte de prix plancher suit les règles du skill pricing-strategy.' : 'Prix US d’exemple : la grille US reste à fixer avec le skill pricing-strategy.'}</div>`;
+      break;
+    case 'financeQG': {
+      const costs = m.costs.reduce((s, c) => s + c[1], 0);
+      body = sec('Partage du cash du mois', rows([['Total encaissé', `<span class="mono">${money(m.cash)}</span>`], ['Jay (50 %)', `<span class="mono">${money(m.cash / 2)}</span>`], ['Junior (50 %)', `<span class="mono">${money(m.cash / 2)}</span>`]]))
+        + sec('Coûts du mois', rows([...m.costs.map(c => [esc(c[0]), `<span class="mono">${money(c[1])}</span>`]), ['<b>Total</b>', `<b class="mono">${money(costs)}</b>`]]))
+        + `<div class="note">Montants avant cotisations et impôts. Tous les paiements arrivent sur le Stripe de J-Square.</div>`;
+      break; }
+    case 'proposals':
+      body = sec('Suivi des offres', rows([['Démos prévues', m.pipeline.demo], ['Brouillons à relire', `<span class="warn">${m.pipeline.draft}</span>`], ['Envoyées, en attente', m.pipeline.sent], ['Signées ce mois', `<span class="good">${m.pipeline.won}</span>`], ['Perdues', m.pipeline.lost ? `${m.pipeline.lost} (motif : ${esc(m.pipeline.lostWhy)})` : '0']]))
+        + sec('Documents', rows(m.docs.map(d => [esc(d.t), `<span class="${d.s === 'wait' ? 'warn' : d.s === 'ok' ? 'good' : ''}">${esc(d.l)}</span>`])));
+      break;
+    case 'market':
+      body = sec('Ce que les prospects paient aujourd’hui', rows(m.market.map(r => [esc(r[0]) + (r[2] ? `<br><small style="color:var(--ink-3)">${esc(r[2])}</small>` : ''), `<span class="mono">${esc(r[1])}</span>`])))
+        + `<div class="note">Chaque soir, le reporter croise ces réponses d’appel avec des sources externes (prix des agences concurrentes, études du secteur) avant de juger les prix.</div>`;
+      break;
+    case 'clients':
+      body = sec('Contrats en cours', m.clients.map(c => `<div class="client"><div class="client-top"><b>${esc(c.n)}</b><span class="chip c">${esc(c.offer)}</span></div>
+        <div class="bar cash"><i style="width:${pct(c.done, c.of)}%"></i></div>
+        <div class="client-grid"><span>Généré<b>${c.done} / ${c.of} ${esc(c.goal)}</b></span><span>Encaissé<b>${money(c.paid, m.cur)}</b></span><span>Début du contrat<b>${esc(day(c.start))}</b></span><span>Fin d’engagement<b>${esc(day(c.end))}</b></span>
+        <span>Point mensuel<b>${esc(day(c.next, m.tz))} · ${esc(hm(c.next, m.tz))}</b></span><span>Agenda<b class="good">booké</b></span></div></div>`).join('<div style="height:8px"></div>'))
+        + `<div class="note">Garantie : objectif fixé avec chaque client. S’il n’est pas atteint à la fin des 3 mois, on continue gratuitement jusqu’à l’atteindre.</div>`;
+      break;
+    case 'approve': {
+      const items = (station === 'qg' ? [...D.fr.approve.map(a => ({...a, m:'fr'})), ...D.us.approve.map(a => ({...a, m:'us'}))] : m.approve.map(a => ({...a, m:station}))).filter(a => !done.has(a.id));
+      body = sec('Décisions en attente', items.length ? items.map(a => `<div class="item" data-item="${a.id}" style="flex-wrap:wrap"><span class="chip ${a.m === 'us' ? 'g' : 'w'}">${esc(a.type)}</span><span class="t" style="white-space:normal">${esc(a.t)}<br><small style="color:var(--ink-3)">${esc(a.auto)}</small></span><button class="ok-btn" data-ok="${a.id}" type="button">OK</button><button class="no-btn" data-no="${a.id}" type="button">Non</button></div>`).join('<div style="height:6px"></div>') : '<div class="note">Rien à valider.</div>')
+        + `<div class="note">Chaque OK sans correction compte. Après 5 OK d’affilée sur un même type d’action, l’agent peut le faire seul, si tu l’autorises dans sa salle. Envoyer de l’argent, changer un prix ou écrire à un client pour la première fois reste toujours soumis à ta validation.</div>`;
+      break; }
+    case 'agenda':
+      body = sec(`À venir · heure ${m.key === 'fr' ? 'de Paris' : 'de Floride sauf mention'}`, rows(m.agenda.map(e => [esc(e.t), `<span class="mono">${esc(day(e.d, e.tz || m.tz))} · ${esc(hm(e.d, e.tz || m.tz))}</span>`])))
+        + `<div class="note">Les points mensuels sont bookés automatiquement dans l’agenda de ${esc(m.owner)} à la date anniversaire du contrat.</div>`;
+      break;
+    case 'report':
+      body = sec('Rapport du 2 octobre · 23:00', `<div class="rows"><div><span>Verdict</span><span class="good"><b>Tenir le cap</b></span></div><div><span>Appels France / USA</span><span class="mono">83 / 41</span></div><div><span>Démos prises</span><span class="mono">3</span></div><div><span>Signature après démo</span><span class="mono">25 %</span></div><div><span>Échantillon pour juger le prix</span><span class="mono">12 / 20 démos</span></div></div>`)
+        + sec('Pourquoi', `<div class="note" style="color:var(--ink-2)">Pas assez de démos pour toucher aux prix. Les gérants joints paient en médiane 450 €/mois à leur agence : la grille reste en dessous. Le prix n’est cité comme motif de refus qu’une fois sur 9.</div>`)
+        + `<div class="note">Le rapport arrive chaque soir à 23:00 dans la messagerie Hermès.</div>`;
+      break;
+    case 'research':
+      body = sec('Pistes en cours', rows([
+        ['<span class="chip w">Structure</span> Tout le cash passe par la micro de Jay : le partage 50/50 ne baisse pas ses cotisations.', '<span class="warn">à voir avec un expert-comptable</span>'],
+        ['<span class="chip">Embauche</span> Un setter devient utile quand il faut plus de 100 appels par jour et par marché.', '<span class="mono">suivi</span>'],
+        ['<span class="chip">Offre</span> Tarif annuel avec 2 mois offerts pour lisser le cash.', '<span class="mono">à tester</span>'],
+        ['<span class="chip">IA</span> Nouveaux outils de rappel vocal à comparer avec Vapi.', '<span class="mono">veille</span>']]))
+        + `<div class="note">Exemples. Le vrai researcher croise vos données avec des sources externes et ne change rien sans ta validation.</div>`;
+      break;
+    case 'agents':
+      body = sec('Agents', rows(AGENTS.map(a => [`<span style="display:inline-flex;align-items:center;gap:8px"><span class="light" data-s="${a.s}"></span>${esc(a.n)}</span><br><small style="color:var(--ink-3)">${esc(a.w)}</small>`, `<span class="mono">${a.c ? a.c.toFixed(2).replace('.', ',') + ' €' : '—'}</span>`])));
+      break;
+  }
+  const auto = AUTONOMY[spec.kind];
+  if (auto) body += sec('Ce que l’agent peut faire seul', `<div class="auto">${auto.map((a, i) => `<div class="auto-row"><span class="lbl">${esc(a[0])}</span><div class="lvl" role="group" aria-label="${esc(a[0])}">${LEVELS.map((l, j) => `<button type="button" class="chip-btn" data-auto="${spec.kind}-${i}" data-lvl="${j}" aria-pressed="${j === a[1]}">${l}</button>`).join('')}</div>${a[2] ? `<small>${esc(a[2])}</small>` : ''}</div>`).join('')}</div>`);
+  openPanel(`<div class="panel-head"><span class="ico">${svg(spec.kind === 'financeQG' ? 'finance' : spec.kind)}</span><div><h2 id="panelTitle">${esc(spec.name)}</h2><p>${esc(spec.agent)} · ${station === 'qg' ? 'deux marchés' : station === 'fr' ? 'France' : 'USA'}</p></div><button class="x" type="button" aria-label="Fermer">${svg('x')}</button></div><div class="panel-body">${body}</div>`);
+}
+
+/* ---------- panneau : messagerie Hermès ---------- */
+function msgHTML(m){
+  return `<div class="msg ${m.f}">${m.html || esc(m.text)}<time>${esc(m.time)}</time></div>`;
+}
+function chatPanel(){
+  unread.n = 0; const u = $('#unread'); if (u) u.hidden = true;
+  openPanel(`<div class="panel-head"><span class="ico">${svg('hermes')}</span><div><h2 id="panelTitle">Hermès</h2><p><span class="light" data-s="online" style="display:inline-block;margin-right:6px"></span>En ligne · centre de contrôle</p></div><button class="x" type="button" aria-label="Fermer">${svg('x')}</button></div>
+    <div class="chat" id="chat">${CHAT.map(msgHTML).join('')}</div>
+    <div class="quick"><button type="button" class="chip-btn" data-q="Résume la journée">Résume la journée</button><button type="button" class="chip-btn" data-q="Faut-il changer les prix ?">Faut-il changer les prix ?</button><button type="button" class="chip-btn" data-q="Combien d’appels reste-t-il ?">Combien d’appels reste-t-il ?</button></div>
+    <form class="composer" id="composer"><label for="chatInput" hidden>Message à Hermès</label><input id="chatInput" autocomplete="off" placeholder="Écris à Hermès…"><button class="btn primary" type="submit">Envoyer</button></form>`);
+  const c = $('#chat'); c.scrollTop = c.scrollHeight;
+}
+function sendChat(text){
+  text = text.trim(); if (!text) return;
+  const time = nowHM();
+  CHAT.push({f:'me', time, text});
+  const c = $('#chat'); if (!c) return;
+  c.insertAdjacentHTML('beforeend', msgHTML(CHAT.at(-1)));
+  c.insertAdjacentHTML('beforeend', `<div class="msg h typing" id="typing"><i></i><i></i><i></i></div>`);
+  c.scrollTop = c.scrollHeight;
+  setTimeout(() => {
+    const t = $('#typing'); if (t) t.remove();
+    const reply = {f:'h', time:nowHM(), text:'Maquette : je ne suis pas encore branché. Dans la vraie version, je réponds ici avec les données du cockpit.'};
+    CHAT.push(reply);
+    const cc = $('#chat'); if (cc) { cc.insertAdjacentHTML('beforeend', msgHTML(reply)); cc.scrollTop = cc.scrollHeight; }
+  }, RM ? 200 : 1100);
+}
+
+/* ---------- décisions ---------- */
+function decide(id, ok){
+  done.add(id);
+  document.querySelectorAll(`[data-item="${id}"]`).forEach(el => el.classList.add('gone'));
+  const all = [...D.fr.approve.map(a => ({...a, m:'fr'})), ...D.us.approve.map(a => ({...a, m:'us'}))].find(a => a.id === id);
+  journal.unshift({time:nowHM(), m:all ? all.m : 'all', who:'À valider', t:`${ok ? 'Validé' : 'Refusé'} : ${all ? all.type.toLowerCase() + ' · ' + all.t : id}.`});
+  setTimeout(() => {
+    const plan = $('#plan'), roomEl = plan.querySelector('.room[data-room="valider"]');
+    if (roomEl) roomEl.querySelector('.room-body').innerHTML = BODY.approve(D[station]);
+    document.querySelectorAll('[data-live="pending"]').forEach(el => el.textContent = pendingCount());
+    ['fr', 'us'].forEach(k => document.querySelectorAll(`[data-live="pending-${k}"]`).forEach(el => el.textContent = D[k].approve.filter(a => !done.has(a.id)).length));
+    renderJournal(true);
+    if (ok) packet('valider', 'var(--cash)');
+    const p = $('#panel'); if (!p.hidden) { const it = p.querySelector(`[data-item="${id}"]`); if (it) it.remove(); }
+  }, RM ? 0 : 350);
+}
+
+/* ---------- événements ---------- */
+document.addEventListener('click', e => {
+  const t = e.target;
+  const tab = t.closest('.switch button'); if (tab) { render(tab.dataset.st); return; }
+  const ok = t.closest('[data-ok]'); if (ok) { e.stopPropagation(); decide(ok.dataset.ok, true); return; }
+  const no = t.closest('[data-no]'); if (no) { e.stopPropagation(); decide(no.dataset.no, false); return; }
+  const go = t.closest('[data-go]'); if (go) { goSlide(+go.dataset.go); return; }
+  const st = t.closest('[data-step]'); if (st) { goSlide(slide + (+st.dataset.step)); return; }
+  const lvl = t.closest('[data-lvl]'); if (lvl) { lvl.parentElement.querySelectorAll('.chip-btn').forEach(b => b.setAttribute('aria-pressed', b === lvl ? 'true' : 'false')); return; }
+  const q = t.closest('[data-q]'); if (q) { sendChat(q.dataset.q); return; }
+  if (t.closest('.x') || t === $('#scrim')) { closePanel(); return; }
+  if (t.closest('#openChat')) { chatPanel(); return; }
+  const room = t.closest('.room'); if (room) { roomPanel(room.dataset.room); return; }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !$('#panel').hidden) { closePanel(); return; }
+  const room = e.target.closest && e.target.closest('.room');
+  if (room && (e.key === 'Enter' || e.key === ' ') && e.target === room) { e.preventDefault(); roomPanel(room.dataset.room); }
+});
+document.addEventListener('submit', e => {
+  if (e.target.id === 'composer') { e.preventDefault(); const i = $('#chatInput'); sendChat(i.value); i.value = ''; }
+});
+document.addEventListener('scroll', e => {
+  if (e.target && e.target.id === 'slides') {
+    const sl = e.target, i = Math.round(sl.scrollLeft / Math.max(1, sl.clientWidth));
+    if (i !== slide) { slide = i; syncPager(); }
+  }
+}, true);
+let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { drawConduits(); movePill(); const sl = $('#slides'); if (sl) sl.scrollLeft = slide * sl.clientWidth; }, 120); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { drawConduits(); movePill(); });
+
+/* ---------- horloges ---------- */
+setInterval(() => {
+  const head = $('#stationHead'); if (head) head.innerHTML = headHTML(station);
+  document.querySelectorAll('[data-live="countdown"]').forEach(el => el.textContent = countdown());
+}, 30000);
+
+/* ---------- démarrage ---------- */
+const start = (location.hash || '').replace('#', '');
+render(['fr', 'qg', 'us'].includes(start) ? start : 'qg', {keepHash:true});
+window.addEventListener('hashchange', () => { const k = location.hash.replace('#', ''); if (['fr', 'qg', 'us'].includes(k) && k !== station) render(k, {keepHash:true}); });
+syncPager();
+if (!RM) setInterval(simulate, 4200);
+})();
+</script>
