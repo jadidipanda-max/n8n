@@ -446,7 +446,7 @@ D.qg = {
   cumulStart:'2026-09-08',
   steps:(() => { const all = [...D.fr.steps.map((s, i, a) => [s[0], s[1] - (a[i-1] ? a[i-1][1] : 0)]), ...D.us.steps.map((s, i, a) => [s[0], (s[1] - (a[i-1] ? a[i-1][1] : 0)) * FX])].sort((a, b) => a[0] < b[0] ? -1 : 1); let c = 0; return all.map(([d, v]) => [d, c += v]); })(),
   costs:[['n8n (livraison clients)', 24], ['VPS (Hermès)', 6], ['Crédits API d’Hermès', 38], ['Apify', 5], ['Domaine et e-mails', 8]],
-  thresholds:{tva:37500, micro:77700} // à confirmer par l'agent finance
+  thresholds:{tva:37500, tvaMaj:41250, micro:83600} // seuils 2026 : TVA sur le CA France seul, plafond micro sur tout le CA encaissé
 };
 const CHAT = [
   {f:'h', time:'hier 23:00', html:`<b>Rapport du 2 octobre</b><ul><li>France : 83 appels, 47 gérants joints, 2 démos prises.</li><li>USA : 41 appels, 1 démo prise.</li><li>Cash du mois : ${money(D.qg.cash)} (France ${money(D.fr.cash)} · USA ${money(D.us.cash, 'USD')}).</li><li>Verdict : <b>tenir le cap</b>. 12 démos sur les 20 nécessaires pour juger le prix.</li></ul>3 décisions t’attendent.`},
@@ -579,6 +579,7 @@ const BODY = {
   },
   research(m){
     return `<ul class="mini"><li><span><span class="chip w">Structure</span> Tout passe par la micro de Jay</span><span class="warn">à voir</span></li>
+      <li><span><span class="chip w">Factures</span> Plateforme agréée à choisir</span><span class="warn">obligatoire</span></li>
       <li><span><span class="chip">Embauche</span> Setter quand les appels dépassent 100/jour</span><span></span></li>
       <li><span><span class="chip">Offre</span> Tarif annuel avec 2 mois offerts</span><span></span></li></ul>`;
   },
@@ -678,10 +679,12 @@ function stepSVG(m){
 function niceMax(v){ const p = Math.pow(10, Math.floor(Math.log10(v))); for (const k of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (k * p >= v) return k * p; return 10 * p; }
 function short(v, cur){ const s = cur === 'USD' ? ' $' : ' €'; return v >= 1000 ? (v / 1000).toLocaleString('fr-FR', {maximumFractionDigits:1}) + ' k' + s : Math.round(v) + s; }
 function meterHTML(m){
-  const ca = m.steps.at(-1)[1], th = m.thresholds, max = th.micro;
-  return `<div class="meter"><div class="meter-l"><span>Chiffre d’affaires 2026 de la micro de Jay</span><span class="mono">${money(ca)}</span></div>
-    <div class="meter-bar"><i style="width:${pct(ca, max)}%"></i><em style="left:${pct(th.tva, max)}%"></em></div>
-    <div class="meter-l"><span>Seuil de TVA ${money(th.tva)}</span><span>Plafond micro ${money(th.micro)}</span></div></div>`;
+  const th = m.thresholds, caFr = D.fr.steps.at(-1)[1], caAll = m.steps.at(-1)[1];
+  return `<div class="meter"><div class="meter-l"><span>CA France (seuil de TVA)</span><span class="mono">${money(caFr)} / ${money(th.tvaMaj)}</span></div>
+    <div class="meter-bar"><i style="width:${pct(caFr, th.tvaMaj)}%"></i><em style="left:${pct(th.tva, th.tvaMaj)}%"></em></div>
+    <div class="meter-l"><span>Repère : ${money(th.tva)}</span><span>TVA due dès ${money(th.tvaMaj)}</span></div></div>
+    <div class="meter"><div class="meter-l"><span>CA total encaissé (plafond micro)</span><span class="mono">${money(caAll)} / ${money(th.micro)}</span></div>
+    <div class="meter-bar"><i style="width:${pct(caAll, th.micro)}%"></i></div></div>`;
 }
 
 /* ---------- station ---------- */
@@ -884,7 +887,8 @@ function roomPanel(id){
       break;
     case 'research':
       body = sec('Pistes en cours', rows([
-        ['<span class="chip w">Structure</span> Tout le cash passe par la micro de Jay : le partage 50/50 ne baisse pas ses cotisations.', '<span class="warn">à voir avec un expert-comptable</span>'],
+        ['<span class="chip w">Structure</span> Tout le cash passe par la micro de Jay : il cotise sur 100 % et la part de Junior n’est pas déductible. Pistes : chacun sa structure, ou une SAS à deux.', '<span class="warn">expert-comptable avant fin mars 2027</span>'],
+        ['<span class="chip w">Factures</span> Plateforme agréée de réception obligatoire depuis le 1ᵉʳ sept. 2026. Émission en électronique au 1ᵉʳ sept. 2027.', '<span class="warn">à choisir</span>'],
         ['<span class="chip">Embauche</span> Un setter devient utile quand il faut plus de 100 appels par jour et par marché.', '<span class="mono">suivi</span>'],
         ['<span class="chip">Offre</span> Tarif annuel avec 2 mois offerts pour lisser le cash.', '<span class="mono">à tester</span>'],
         ['<span class="chip">IA</span> Nouveaux outils de rappel vocal à comparer avec Vapi.', '<span class="mono">veille</span>']]))
