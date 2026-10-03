@@ -104,18 +104,21 @@ La simulation est sur 12 mois, de novembre 2026 à octobre 2027. Hypothèses non
 - **Seuils, si tout passe par la micro de Jay** :
   - TVA France (41 250 €) dépassée en mars 2027, avec TVA due dès ce jour sur les factures France ;
   - plafond micro (83 600 €) dépassé en mars 2027 aussi ;
-  - si la micro a été créée en 2026, les seuils 2026 sont réduits au prorata et peuvent sauter dès décembre 2026.
+  - la micro a été créée en août 2026 : les seuils 2026 sont réduits au prorata des jours d'activité. Selon le jour exact de création (du 1ᵉʳ au 31 août) :
+    - TVA due dès **13 900 à 17 300 €** de CA France encaissé en 2026 ;
+    - plafond micro 2026 : **28 200 à 35 000 €**, sur tout le CA encaissé (France et US).
+    Avec 6 + 6 clients dès novembre, ces deux seuils peuvent sauter dès décembre 2026. Dépasser le plafond en 2026 puis en 2027 ferait passer au régime réel au 1ᵉʳ janvier 2028.
 - **Heures** : avec les 10 à 13 h par client et par mois du calculateur, l'Essentiel à 390 € et le Starter à 497 $ perdent de l'argent dès qu'on paie l'heure de livraison (le plancher est à 672 € pour 11,5 h). À 6 h par client, le plancher tombe à 376 €.
 - **Embauches** (aux heures actuelles) :
   - un setter par marché dès novembre 2026 ;
   - une personne en livraison dès décembre 2026 en France, dès novembre aux US ;
   - un closer vers février à avril 2027, ou plus tôt si moins d'1 démo sur 4 signe.
-- **Partage** : si Jay reverse 50 % du cash brut, il cotise seul sur 100 %. Il toucherait environ 99 000 € et Junior environ 268 000 € sur 12 mois. Le partage doit se faire sur ce qui reste après cotisations et coûts.
+- **Partage** : décidé le 3 octobre. On paie d'abord toutes les cotisations et tous les coûts, puis on partage le résultat à 50/50. L'impôt sur le revenu de Jay porte aussi sur tout le CA (moins l'abattement forfaitaire de 34 % en BNC) : à provisionner avant le partage, ou à répartir d'un commun accord.
 
 ## 7. À faire, dans l'ordre
 
 1. **Cette semaine** :
-   - rendez-vous avec un expert-comptable : structure du 50/50 (chacun sa structure ou SAS à deux), BIC ou BNC, date de création de la micro, CA déjà encaissé en 2026, résidence fiscale et statut de Junior ;
+   - rendez-vous avec un expert-comptable : seuils 2026 au prorata (création en août), versement de la part de Junior au Cameroun depuis la micro, et le moment de passer en société (SAS) avant que le plafond ne bloque ;
    - choisir la plateforme agréée de facturation électronique ;
    - Junior fixe les prix US avec le skill `pricing-strategy`.
 2. **Semaine 1** : projet Supabase + schéma + droits. Stripe (SEPA, ACH, deux modèles de facture). Flux Stripe → n8n → Supabase.
@@ -127,11 +130,19 @@ La simulation est sur 12 mois, de novembre 2026 à octobre 2027. Hypothèses non
    - synchronisation puis migration des écrans d'appel.
 6. **Pendant les pilotes** : mesurer les heures réelles par client et viser 6 h ou moins (modèles de visuels et de campagnes, rapports automatiques par n8n, points clients groupés).
 
-## 8. Questions ouvertes
+## 8. Réponses du 3 octobre et questions encore ouvertes
 
-- Jay est-il inscrit en BIC ou en BNC ? Quelle est la date de création de sa micro ?
-- Où réside Junior fiscalement, et quel est son statut ?
-- Quels sont les prix US ?
-- L'architecture C (cockpit en application web sur le VPS) est-elle validée ? Elle remplace l'artifact pour l'usage quotidien ; la maquette reste la référence de design.
-- Faut-il afficher le cash US converti en euros au QG ? À quel taux : BCE du jour ou taux fixe du mois ?
-- Junior doit-il voir les leads France ? C'est une décision RGPD et de gouvernance.
+**Réponses de Jay :**
+- **Micro de Jay** :
+  - créée en août 2026, activité « conseil, gestion, automatisation », sans ACRE ;
+  - c'est très probablement du BNC (cotisations 25,6 %), à confirmer avec le code APE sur l'avis de situation SIRENE.
+- **Junior** : résident fiscal au Cameroun, sans entreprise ni statut pour l'instant. Sa part est versée sur le résultat après cotisations et coûts.
+- **Prix US** : plus élevés qu'en France. Junior les fixe avec le skill `pricing-strategy`. Si le premier client US arrive avant les premiers résultats en France, les preuves serviront à monter les prix.
+- **Cockpit** : application web validée, avec un compte et un mot de passe par personne.
+
+**Encore ouvert :**
+- Jour exact de création de la micro (il fixe les seuils 2026 au prorata).
+- CA déjà encaissé en 2026.
+- Ce que Junior doit déclarer au Cameroun pour sa part (à voir de son côté).
+- Faut-il afficher le cash US converti en euros au QG ? Par défaut : taux BCE du jour de chaque paiement.
+- Junior doit-il voir les leads France ? C'est une décision RGPD et de gouvernance. Par défaut, il lit tout et n'écrit que ses lignes.
