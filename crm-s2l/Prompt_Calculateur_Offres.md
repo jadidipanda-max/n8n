@@ -76,11 +76,12 @@ Voir le registre pour le détail.
 - **Le temps de Jay** : environ 8 à 10 h de mise en place par client, puis 10 à 13 h par mois (pubs, vidéos, points avec le client). **C'est le vrai coût.**
 - **Statut** : micro-entreprise.
   - Cotisations calculées sur le chiffre d'affaires encaissé : 21,2 % en BIC ou 25,6 % en BNC, à vérifier sur son attestation. Les dépenses ne sont pas déductibles.
-  - Pas de TVA facturée jusqu'à environ 37 500 € de chiffre d'affaires de services par an : écrire « TVA non applicable, art. 293 B du CGI ».
-  - Plafond de 77 700 € par an.
-  - **Ordres de grandeur** : la TVA s'applique à partir de 4 ou 5 clients à environ 690 €, et la sortie de la micro-entreprise vers 9 ou 10 clients.
+  - Franchise de TVA (2026) : seul compte le chiffre d'affaires France. Les med spas US, clients professionnels hors UE, n'y entrent pas (art. 259-1 du CGI, à confirmer par le comptable). Repère : 37 500 € sur l'année précédente. La TVA est due dès le jour où le CA de l'année dépasse 41 250 €. Tant que la franchise s'applique, écrire « TVA non applicable, art. 293 B du CGI » sur les factures France.
+  - Plafond de la micro-entreprise : 83 600 € par an en 2026, 2027 et 2028, sur TOUT le CA encaissé (France et US). L'année de création, les deux seuils sont réduits au prorata des jours d'activité.
+  - **Ordres de grandeur** : la TVA s'applique à partir de 4 ou 5 clients France à environ 690 € (8 ou 9 à 390 €), plus tôt avec les mises en place et les packs payés d'avance. Le plafond micro est atteint vers 10 clients à 690 € (environ 18 à 390 €) sur une année pleine, en comptant le CA US et la part de Junior.
 - **Formule du prix plancher** (à afficher pour chaque offre) :
   `plancher = (heures par mois × taux horaire visé + coût technique) ÷ (1 − taux de cotisations)`
+  - Si le client paie sur la micro de Jay et que Junior touche une part, Jay cotise aussi sur cette part. Le partage 50/50 se calcule donc sur ce qui reste APRÈS cotisations et coûts, jamais sur le prix encaissé.
   - Taux horaire visé par défaut : 40 € de l'heure, à confirmer avec Jay.
   - Une offre sous le plancher n'est acceptable que si elle est **limitée dans le temps** (pilote, lancement), **écrite**, et qu'elle **rapporte autre chose** : un témoignage, des chiffres publiables, des présentations à d'autres clients.
 

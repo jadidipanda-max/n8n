@@ -341,7 +341,7 @@ button{font:inherit;color:inherit}
 (() => {
 'use strict';
 const RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const FX = 0.86; // € pour 1 $, hypothèse de la maquette
+const FX = 0.891; // € pour 1 $ (taux BCE du 2 octobre 2026)
 const TODAY_EX = '2026-10-03'; // date des données d'exemple
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -445,7 +445,7 @@ D.qg = {
   expected:D.fr.expected.map((e, i) => ({m:e.m, eng:e.eng + D.us.expected[i].eng * FX, prob:e.prob + D.us.expected[i].prob * FX})),
   cumulStart:'2026-09-08',
   steps:(() => { const all = [...D.fr.steps.map((s, i, a) => [s[0], s[1] - (a[i-1] ? a[i-1][1] : 0)]), ...D.us.steps.map((s, i, a) => [s[0], (s[1] - (a[i-1] ? a[i-1][1] : 0)) * FX])].sort((a, b) => a[0] < b[0] ? -1 : 1); let c = 0; return all.map(([d, v]) => [d, c += v]); })(),
-  costs:[['n8n (livraison clients)', 24], ['VPS (Hermès)', 6], ['Crédits API d’Hermès', 38], ['Apify', 5], ['Domaine et e-mails', 8]],
+  costs:[['Serveur OVH (n8n, Hermès, cockpit)', 8.65], ['Crédits API d’Hermès', 23], ['Supabase Pro', 22], ['Revolut Business', 10], ['Nom de domaine', 1.35]],
   thresholds:{tva:37500, tvaMaj:41250, micro:83600} // seuils 2026 : TVA sur le CA France seul, plafond micro sur tout le CA encaissé
 };
 const CHAT = [
@@ -463,7 +463,7 @@ const ROOMS = {
     {id:'gate-us', area:'e', kind:'gate', m:'us', name:'Station USA', agent:'Junior', s:'gate'},
     {id:'finance', area:'f', kind:'financeQG', name:'Finance', agent:'Agent finance', s:'run', said:'Cash du mois partagé 50/50, avant cotisations.', when:'il y a 3 min'},
     {id:'valider', area:'g', kind:'approve', name:'À valider', agent:'Toutes les salles', s:'wait', said:'5 décisions en attente, dont 2 pour Junior.', when:'à l’instant'},
-    {id:'agents', area:'h', kind:'agents', name:'État des agents', agent:'6 agents et Hermès', s:'ok', said:'Aucune erreur depuis 3 jours.', when:'il y a 1 min'}],
+    {id:'agents', area:'h', kind:'agents', name:'État des agents', agent:'7 agents et Hermès', s:'ok', said:'Aucune erreur depuis 3 jours.', when:'il y a 1 min'}],
   fr:[
     {id:'prospection', area:'a', kind:'prospect', name:'Prospection', agent:'Agent lead gen', s:'run', said:'856 leads restent à appeler : pas besoin d’en chercher.', when:'il y a 6 min'},
     {id:'hermes', area:'b', kind:'hermes', name:'Hermès', agent:'Centre de contrôle', s:'online', said:'Paiement Atelier Bois & Plan ajouté au cash.', when:'09:12'},
@@ -490,6 +490,7 @@ const AGENTS = [
   {n:'Propositions et contrats', s:'wait', w:'2 brouillons à relire', c:0.52},
   {n:'Rapport du soir', s:'idle', w:'Prochain rapport à 23:00', c:0},
   {n:'Recherche rentabilité', s:'run', w:'Compare les statuts juridiques', c:0.61},
+  {n:'Suivi clients', s:'ok', w:'Points mensuels bookés', c:0.12},
   {n:'Hermès', s:'online', w:'Centre de contrôle', c:0.94}];
 const AUTONOMY = {
   prospect:[['Préparer les messages Facebook du jour', 2], ['Lancer une mission de recherche de leads (Apify)', 0]],
@@ -571,7 +572,7 @@ const BODY = {
     return `<svg class="radar" viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="sw" x1="0" x2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity="0"/><stop offset="1" stop-color="var(--accent)" stop-opacity=".35"/></linearGradient></defs>
       <circle class="ring" cx="60" cy="60" r="52"/><circle class="ring" cx="60" cy="60" r="34"/><circle class="ring" cx="60" cy="60" r="16"/>
       <g class="sweep"><path d="M60 60 L112 60 A52 52 0 0 0 96.8 23.2 Z" fill="url(#sw)"/></g>${dots}<circle cx="60" cy="60" r="5" fill="var(--ink)"/></svg>
-      <ul class="mini"><li><span>Agents suivis</span><span class="mono">6</span></li><li><span>Décisions en attente</span><span class="mono warn" data-live="pending">${pendingCount()}</span></li></ul>`;
+      <ul class="mini"><li><span>Agents suivis</span><span class="mono">7</span></li><li><span>Décisions en attente</span><span class="mono warn" data-live="pending">${pendingCount()}</span></li></ul>`;
   },
   report(m){
     return `<div class="verdict"><svg class="needle" viewBox="0 0 24 24" fill="none" stroke="var(--cash)" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 12l4-6"/></svg>Tenir le cap</div>
