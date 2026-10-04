@@ -1,0 +1,40 @@
+{
+  "id": "evt_3SKwXyJ8kR4mTzWQ1RefPart",
+  "object": "event",
+  "api_version": "2026-08-26.dahlia",
+  "created": 1791109290,
+  "livemode": true,
+  "pending_webhooks": 1,
+  "request": { "id": "req_Rf0nd1aZx2", "idempotency_key": "b8a6c6a2-3d7e-4a1e-9d1c-2f6c9b0a7e11" },
+  "type": "charge.refunded",
+  "data": {
+    "object": {
+      "id": "ch_3SKw3lJ8kR4mTzWQ0Aur0re1",
+      "object": "charge",
+      "amount": 39000,
+      "amount_captured": 39000,
+      "amount_refunded": 15000,
+      "balance_transaction": "txn_3SKw3lJ8kR4mTzWQ0Aur0re1",
+      "billing_details": { "email": "contact@institut-aurore.fr", "name": "Institut Aurore" },
+      "calculated_statement_descriptor": "J-SQUARE",
+      "captured": true,
+      "created": 1791097923,
+      "currency": "eur",
+      "customer": "cus_TAu7r0reInst1t",
+      "description": "Subscription update",
+      "disputed": false,
+      "livemode": true,
+      "metadata": {},
+      "paid": true,
+      "payment_intent": "pi_3SKw3lJ8kR4mTzWQ0Aur0re1",
+      "payment_method": "pm_1RqAu5J8kR4mTzWQSepaAur0",
+      "payment_method_details": { "sepa_debit": { "bank_code": "30004", "country": "FR", "last4": "3456" }, "type": "sepa_debit" },
+      "receipt_url": "https://pay.stripe.com/receipts/invoices/CAcaFwoV",
+      "refunded": false,
+      "status": "succeeded"
+    },
+    "previous_attributes": {
+      "amount_refunded": 0
+    }
+  }
+}

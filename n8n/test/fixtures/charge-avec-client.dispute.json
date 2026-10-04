@@ -1,0 +1,19 @@
+{
+  "id": "ch_3SKx9oJ8kR4mTzWQ0G1owAe1",
+  "object": "charge",
+  "amount": 49700,
+  "amount_refunded": 0,
+  "created": 1791117902,
+  "currency": "usd",
+  "customer": {
+    "id": "cus_TG1owAesthet1c",
+    "object": "customer",
+    "email": "owner@glowaesthetics.com",
+    "metadata": { "marche": "us" },
+    "name": "Glow Aesthetics"
+  },
+  "disputed": true,
+  "livemode": true,
+  "paid": true,
+  "status": "succeeded"
+}

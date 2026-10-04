@@ -1,0 +1,31 @@
+{
+  "id": "evt_1SKyZ0J8kR4mTzWQD1sputeA",
+  "object": "event",
+  "api_version": "2026-08-26.dahlia",
+  "created": 1791119500,
+  "livemode": true,
+  "pending_webhooks": 1,
+  "request": { "id": null, "idempotency_key": null },
+  "type": "charge.dispute.created",
+  "data": {
+    "object": {
+      "id": "du_1SKyYzJ8kR4mTzWQG1owDisp",
+      "object": "dispute",
+      "amount": 49700,
+      "balance_transactions": [],
+      "charge": "ch_3SKx9oJ8kR4mTzWQ0G1owAe1",
+      "created": 1791119400,
+      "currency": "usd",
+      "enhanced_eligibility_types": [],
+      "evidence": { "customer_email_address": "owner@glowaesthetics.com", "customer_name": "Glow Aesthetics" },
+      "evidence_details": { "due_by": 1792022399, "enhanced_eligibility": {}, "has_evidence": false, "past_due": false, "submission_count": 0 },
+      "is_charge_refundable": false,
+      "livemode": true,
+      "metadata": {},
+      "payment_intent": "pi_3SKx9oJ8kR4mTzWQ0G1owAe1",
+      "payment_method_details": { "card": { "brand": "visa", "case_type": "chargeback", "network_reason_code": "10.4" }, "type": "card" },
+      "reason": "fraudulent",
+      "status": "needs_response"
+    }
+  }
+}

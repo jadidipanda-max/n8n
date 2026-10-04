@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Cockpit J-Square : le cash des marchés France et USA, les agents et Hermès.">
+<title>Tour de contrôle J-Square</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230D1424'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.7' stroke-linecap='round'%3E%3Cpath d='M9 21l1.4-9h3.2L15 21M6.5 12h11M8.2 12l1.1-4.5h5.4l1.1 4.5M12 7.5V3.5'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+<!-- supabase-js est chargé par app.js seulement hors mode démo (version figée du contrat). -->
+<script src="demo.js" defer></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+
+<!-- Chargement -->
+<div class="screen" id="boot" role="status" aria-live="polite">
+  <div class="boot">
+    <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21l1.4-9h3.2L15 21"/><path d="M6.5 12h11"/><path d="M8.2 12l1.1-4.5h5.4l1.1 4.5"/><path d="M12 7.5V3.5"/><path d="M9.5 4.5a3.5 3.5 0 0 1 5 0"/></svg></span>
+    <span class="spinner" aria-hidden="true"></span>
+    <span id="bootText">Chargement du cockpit…</span>
+  </div>
+</div>
+
+<!-- Connexion -->
+<main class="screen" id="auth" hidden>
+  <section class="card" aria-labelledby="authTitle">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21l1.4-9h3.2L15 21"/><path d="M6.5 12h11"/><path d="M8.2 12l1.1-4.5h5.4l1.1 4.5"/><path d="M12 7.5V3.5"/><path d="M9.5 4.5a3.5 3.5 0 0 1 5 0"/></svg></span>
+      <div><div class="brand-name">J-Square</div><div class="brand-sub">Tour de contrôle</div></div>
+    </div>
+
+    <form class="form" id="loginForm" novalidate>
+      <div><h1 id="authTitle">Connexion</h1><p>Réservé à Jay et Junior. Les comptes sont créés par Jay dans Supabase.</p></div>
+      <div class="alert info" id="loginInfo" role="status" hidden></div>
+      <div class="field"><label for="loginEmail">Adresse e-mail</label><input id="loginEmail" name="email" type="email" autocomplete="username" inputmode="email" required></div>
+      <div class="field"><label for="loginPassword">Mot de passe</label><input id="loginPassword" name="password" type="password" autocomplete="current-password" required></div>
+      <div class="alert err" id="loginError" role="alert" hidden></div>
+      <button class="btn primary wide" type="submit" id="loginSubmit">Se connecter</button>
+      <div class="row-between"><button class="link" type="button" id="forgotLink">Mot de passe oublié ?</button><a class="fine" href="?demo" id="demoLink">Voir la démo</a></div>
+    </form>
+
+    <form class="form" id="forgotForm" novalidate hidden>
+      <div><h1>Mot de passe oublié</h1><p>Indique ton adresse e-mail : tu recevras un lien pour choisir un nouveau mot de passe.</p></div>
+      <div class="field"><label for="forgotEmail">Adresse e-mail</label><input id="forgotEmail" name="email" type="email" autocomplete="username" inputmode="email" required></div>
+      <div class="alert err" id="forgotError" role="alert" hidden></div>
+      <div class="alert ok" id="forgotOk" role="status" hidden></div>
+      <button class="btn primary wide" type="submit" id="forgotSubmit">Envoyer le lien</button>
+      <div><button class="link" type="button" id="backToLogin">Retour à la connexion</button></div>
+    </form>
+
+    <form class="form" id="recoverForm" novalidate hidden>
+      <div><h1>Nouveau mot de passe</h1><p>Choisis un mot de passe d’au moins 8 caractères, que tu n’utilises nulle part ailleurs.</p></div>
+      <div class="field"><label for="newPassword">Nouveau mot de passe</label><input id="newPassword" type="password" autocomplete="new-password" minlength="8" required></div>
+      <div class="field"><label for="newPassword2">Le même, une deuxième fois</label><input id="newPassword2" type="password" autocomplete="new-password" minlength="8" required></div>
+      <div class="alert err" id="recoverError" role="alert" hidden></div>
+      <button class="btn primary wide" type="submit" id="recoverSubmit">Enregistrer et entrer</button>
+    </form>
+  </section>
+</main>
+
+<!-- Erreur bloquante -->
+<main class="screen" id="fatal" hidden>
+  <section class="card" aria-labelledby="fatalTitle">
+    <div><h1 id="fatalTitle">Un problème est survenu</h1><p id="fatalText"></p></div>
+    <div class="row-between">
+      <button class="btn primary" type="button" id="fatalRetry">Réessayer</button>
+      <button class="btn" type="button" id="fatalLogout" hidden>Se déconnecter</button>
+      <a class="fine" href="?demo" id="fatalDemo" hidden>Voir la démo en attendant</a>
+    </div>
+  </section>
+</main>
+
+<!-- Tour de contrôle -->
+<div class="app" id="app" hidden>
+  <header class="top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21l1.4-9h3.2L15 21"/><path d="M6.5 12h11"/><path d="M8.2 12l1.1-4.5h5.4l1.1 4.5"/><path d="M12 7.5V3.5"/><path d="M9.5 4.5a3.5 3.5 0 0 1 5 0"/></svg></span>
+      <div><div class="brand-name">J-Square</div><div class="brand-sub">Tour de contrôle</div></div>
+    </div>
+    <nav class="switch" role="tablist" aria-label="Choisir la station">
+      <span class="pill" id="pill" aria-hidden="true"></span>
+      <button role="tab" type="button" id="tab-fr" data-st="fr" aria-selected="false">France</button>
+      <button role="tab" type="button" id="tab-qg" data-st="qg" aria-selected="true">QG</button>
+      <button role="tab" type="button" id="tab-us" data-st="us" aria-selected="false">USA</button>
+    </nav>
+    <div class="top-right">
+      <span class="demo-badge" id="demoBadge" hidden>Données d’exemple</span>
+      <button class="btn" id="openChat" type="button"><span class="light" id="hermesLight" data-s="online"></span>Hermès <span class="unread" id="unread" hidden>0</span></button>
+      <div class="me-box" id="meBox">
+        <span class="me-name" id="meName"></span>
+        <button class="btn icon" type="button" id="logout" aria-label="Se déconnecter" title="Se déconnecter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 16l-4-4 4-4"/><path d="M6 12h10"/></svg></button>
+        <a class="btn small" href="./" id="leaveDemo" hidden>Quitter la démo</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="demo-banner" id="demoBanner" role="note" hidden><span class="light" aria-hidden="true"></span><span><b>Données d’exemple.</b> Rien ici n’est réel : c’est le cockpit en mode démo, sans connexion à Supabase.</span></div>
+
+  <section class="station-head" id="stationHead" aria-live="polite"></section>
+  <section class="plan" id="plan" aria-label="Plan de la station"></section>
+
+  <section class="journal" aria-label="Journal en direct">
+    <div class="journal-head"><strong>Journal en direct</strong><span id="journalStatus"></span></div>
+    <ol id="journal"></ol>
+  </section>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="panelTitle" hidden></aside>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+</body>
+</html>

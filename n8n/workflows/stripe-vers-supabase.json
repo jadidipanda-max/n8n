@@ -1,0 +1,630 @@
+{
+  "name": "stripe-vers-supabase",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Stripe → Supabase\nChaque paiement Stripe arrive ici et remplit le cash du cockpit.\n1. Mets l'URL de ton projet Supabase dans **Réglages**.\n2. Choisis les identifiants « Stripe J-Square » et « Supabase n8n (clé secrète) » dans les nœuds.\n3. Active le workflow : n8n crée lui-même le webhook dans Stripe.\nLe code des nœuds Code vient de `n8n/stripe-mapping.js` (ne pas le modifier ici).",
+        "height": 220,
+        "width": 520,
+        "color": 5
+      },
+      "id": "ff3fef3f-244f-5cee-87e5-c2ad1fa54bb6",
+      "name": "À lire",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "events": [
+          "invoice.paid",
+          "invoice.payment_failed",
+          "customer.subscription.created",
+          "customer.subscription.updated",
+          "customer.subscription.deleted",
+          "charge.refunded",
+          "charge.dispute.created"
+        ],
+        "apiVersion": "2026-08-26.dahlia"
+      },
+      "id": "aa1e5104-2409-5e27-9fa4-490b454a2eac",
+      "name": "Stripe",
+      "type": "n8n-nodes-base.stripeTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "255f2927-4be1-55f6-9069-4c6461383c25",
+      "credentials": {
+        "stripeApi": {
+          "id": null,
+          "name": "Stripe J-Square"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "de2b7ce2-e7ad-5e32-8fca-a07179574ea9",
+              "name": "supabaseUrl",
+              "value": "https://VOTRE-PROJET.supabase.co",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dc120b4b-2423-540f-b993-42ed8f92bce6",
+      "name": "Réglages",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data"
+            }
+          },
+          "timeout": 8000
+        }
+      },
+      "id": "238436c9-974c-5463-8358-15c0919178e8",
+      "name": "Taux BCE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Réglages').first().json.supabaseUrl }}/rest/v1/reglages?cle=eq.change&select=valeur",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "c68732fa-cdd1-5320-a40d-7bbb2d798fa3",
+      "name": "Taux de secours",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "Supabase n8n (clé secrète)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "'use strict';\n// =====================================================================\n// stripe-mapping.js : un événement Stripe devient des lignes Supabase.\n// Contrat : cockpit/CONTRAT-TECHNIQUE.md, sections 1.2 et 4.\n//\n// Fonction pure (aucun appel réseau, aucune horloge) :\n//   transformerEvenementStripe(evenement, contexte)\n//     -> { paiements: [...], abonnements: [...], journal: [...], actions: [...] }\n//   contexte = { client, tauxUsdEur, sourceTaux }\n//     client      : le client Stripe lu par n8n (ou une charge avec le client\n//                   déplié, pour un litige), sinon null\n//     tauxUsdEur  : euros pour 1 dollar (BCE du jour, ou réglage de secours)\n//\n// Ce fichier est collé tel quel dans le nœud Code de n8n par build.js.\n// Il gère les deux formes connues des factures Stripe :\n//   - ancienne (API jusqu'à 2025-02-24.acacia) : invoice.subscription,\n//     lines.data[].price.recurring, lines.data[].type ;\n//   - récente (2025-03-31.basil et après) : invoice.parent.subscription_details,\n//     lines.data[].parent, lines.data[].pricing, lines.data[].period.\n// =====================================================================\n\n// Taux utilisé seulement si n8n n'a ni le taux BCE ni le réglage « change »\nconst TAUX_USD_EUR_DERNIER_RECOURS = 0.891;\n// Engagement par défaut quand l'abonnement Stripe ne précise rien (cahier des charges : 3 mois)\nconst ENGAGEMENT_MOIS_DEFAUT = 3;\n// Types de paiement acceptés par la table paiements\nconst TYPES_PAIEMENT = ['abonnement', 'mise_en_place', 'pack', 'ponctuel', 'remboursement', 'litige'];\n// Une ligne ponctuelle dont la description dit « mise en place » devient mise_en_place\nconst MOTIF_MISE_EN_PLACE = /mise en place|mise-en-place|installation|setup|onboarding|frais de lancement/i;\n// Agent qui signe les lignes de journal et les actions liées à l'argent\nconst AGENT_ARGENT = 'finance';\n\nconst EVENEMENTS_GERES = [\n  'invoice.paid',\n  'invoice.payment_failed',\n  'customer.subscription.created',\n  'customer.subscription.updated',\n  'customer.subscription.deleted',\n  'charge.refunded',\n  'charge.dispute.created',\n];\n\n// ---------------------------------------------------------------------\n// Petits outils\n// ---------------------------------------------------------------------\nfunction vide() {\n  return { paiements: [], abonnements: [], journal: [], actions: [] };\n}\n\nfunction enUnites(centimes) {\n  return Math.round(Number(centimes || 0)) / 100;\n}\n\nfunction arrondi(n, decimales) {\n  const f = Math.pow(10, decimales);\n  return Math.round(n * f) / f;\n}\n\nfunction dateIso(secondes) {\n  if (secondes === null || secondes === undefined || secondes === '') return null;\n  const n = Number(secondes);\n  if (!Number.isFinite(n) || n <= 0) return null;\n  return new Date(n * 1000).toISOString();\n}\n\nfunction idDe(valeur) {\n  if (!valeur) return null;\n  if (typeof valeur === 'string') return valeur;\n  if (typeof valeur === 'object' && typeof valeur.id === 'string') return valeur.id;\n  return null;\n}\n\nfunction texte(valeur, max) {\n  const t = String(valeur === null || valeur === undefined ? '' : valeur).replace(/\\s+/g, ' ').trim();\n  return t.length > max ? t.slice(0, max - 1) + '…' : t;\n}\n\nfunction deviseStripe(code) {\n  return String(code || '').toUpperCase();\n}\n\n// 1280 -> « 1 280 € » ; 997.5 -> « 997,50 $ »\nfunction montantLisible(montant, devise) {\n  const entier = Math.abs(montant % 1) < 0.005;\n  const nombre = new Intl.NumberFormat('fr-FR', {\n    minimumFractionDigits: entier ? 0 : 2,\n    maximumFractionDigits: 2,\n  }).format(montant);\n  const symbole = devise === 'EUR' ? '€' : devise === 'USD' ? '$' : devise;\n  return nombre + ' ' + symbole;\n}\n\nfunction fuseauMarche(marche) {\n  return marche === 'us' ? 'America/New_York' : 'Europe/Paris';\n}\n\n// 1767484800 -> « 4 janvier 2027 » à l'heure du marché\nfunction dateLisible(secondes, marche) {\n  if (!secondes) return '';\n  return new Intl.DateTimeFormat('fr-FR', {\n    day: 'numeric', month: 'long', year: 'numeric', timeZone: fuseauMarche(marche),\n  }).format(new Date(Number(secondes) * 1000));\n}\n\n// Ajoute n mois à une date Stripe (secondes), en gardant le jour si possible\nfunction ajouterMois(secondes, n) {\n  const d = new Date(Number(secondes) * 1000);\n  const jour = d.getUTCDate();\n  const cible = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1,\n    d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()));\n  const dernierJour = new Date(Date.UTC(cible.getUTCFullYear(), cible.getUTCMonth() + 1, 0)).getUTCDate();\n  cible.setUTCDate(Math.min(jour, dernierJour));\n  return cible.toISOString();\n}\n\n// ---------------------------------------------------------------------\n// Client Stripe, marché et taux de change\n// ---------------------------------------------------------------------\n\n// Ce que n8n doit lire chez Stripe pour connaître le client (null : rien à lire)\nfunction cibleClientStripe(evenement) {\n  const objet = (evenement && evenement.data && evenement.data.object) || {};\n  if (evenement && evenement.type === 'charge.dispute.created') {\n    const charge = idDe(objet.charge);\n    return charge ? 'https://api.stripe.com/v1/charges/' + encodeURIComponent(charge) + '?expand[]=customer' : null;\n  }\n  const client = idDe(objet.customer);\n  return client ? 'https://api.stripe.com/v1/customers/' + encodeURIComponent(client) : null;\n}\n\n// Réponse de Stripe (client, ou charge avec client déplié) -> client Stripe ou null\nfunction normaliserClient(reponse) {\n  if (!reponse || typeof reponse !== 'object' || reponse.error) return null;\n  if (reponse.object === 'customer') return reponse.deleted ? null : reponse;\n  if (reponse.object === 'charge' && reponse.customer && typeof reponse.customer === 'object') {\n    return normaliserClient(reponse.customer);\n  }\n  return null;\n}\n\nfunction marcheDuClient(client) {\n  const brut = client && client.metadata && client.metadata.marche;\n  const m = String(brut || '').trim().toLowerCase();\n  return m === 'fr' || m === 'us' ? m : null;\n}\n\n// metadata.marche du client Stripe, sinon la devise (USD donne us)\nfunction choisirMarche(client, devise) {\n  return marcheDuClient(client) || (devise === 'USD' ? 'us' : 'fr');\n}\n\nfunction nomClient(client, objet) {\n  return texte(\n    (client && (client.name || client.email)) ||\n    (objet && (objet.customer_name || objet.customer_email)) ||\n    idDe(objet && objet.customer) ||\n    'client inconnu', 80);\n}\n\n// Taux BCE du jour : le XML donne des dollars pour 1 euro, on veut des euros pour 1 dollar\nfunction lireTauxBce(xml) {\n  if (typeof xml !== 'string') return null;\n  const m = xml.match(/currency=['\"]USD['\"]\\s+rate=['\"]([0-9.]+)['\"]/);\n  if (!m) return null;\n  const dollarsPourUnEuro = Number(m[1]);\n  if (!Number.isFinite(dollarsPourUnEuro) || dollarsPourUnEuro <= 0) return null;\n  const jour = (xml.match(/time=['\"](\\d{4}-\\d{2}-\\d{2})['\"]/) || [])[1] || null;\n  return { taux: arrondi(1 / dollarsPourUnEuro, 6), source: 'BCE ' + (jour || 'du jour') };\n}\n\n// Réglage « change » lu dans Supabase : [{ valeur: { usd_eur, source } }] ou { valeur: … }\nfunction lireTauxSecours(reponse) {\n  const ligne = Array.isArray(reponse) ? reponse[0] : reponse;\n  const valeur = ligne && (ligne.valeur || ligne);\n  const taux = valeur ? Number(valeur.usd_eur) : NaN;\n  if (!Number.isFinite(taux) || taux <= 0) return null;\n  return { taux: taux, source: 'réglage ' + (valeur.source || 'change') };\n}\n\nfunction tauxPour(devise, contexte) {\n  if (devise === 'EUR') return 1;\n  const t = Number(contexte && contexte.tauxUsdEur);\n  return Number.isFinite(t) && t > 0 ? arrondi(t, 6) : TAUX_USD_EUR_DERNIER_RECOURS;\n}\n\n// ---------------------------------------------------------------------\n// Factures : lecture des deux formes connues\n// ---------------------------------------------------------------------\nfunction abonnementDeFacture(facture) {\n  const parent = facture.parent;\n  if (parent && parent.subscription_details) return idDe(parent.subscription_details.subscription);\n  if (facture.subscription) return idDe(facture.subscription);\n  const lignes = (facture.lines && facture.lines.data) || [];\n  for (const l of lignes) {\n    const p = l.parent || {};\n    const s = (p.subscription_item_details && p.subscription_item_details.subscription) ||\n      (p.invoice_item_details && p.invoice_item_details.subscription) || l.subscription;\n    if (s) return idDe(s);\n  }\n  return null;\n}\n\n// Durée de récurrence d'un prix Stripe, en mois\nfunction moisDeRecurrence(recurrence) {\n  if (!recurrence || !recurrence.interval) return null;\n  const n = Number(recurrence.interval_count) || 1;\n  switch (recurrence.interval) {\n    case 'month': return n;\n    case 'year': return 12 * n;\n    case 'week': return Math.max(1, Math.round((7 * n) / 30.44));\n    case 'day': return Math.max(1, Math.round(n / 30.44));\n    default: return null;\n  }\n}\n\n// Durée d'une période de facturation (secondes Stripe), en mois\nfunction moisDePeriode(periode) {\n  if (!periode || !periode.start || !periode.end || periode.end <= periode.start) return null;\n  return Math.max(1, Math.round((periode.end - periode.start) / 86400 / 30.44));\n}\n\nfunction prixDeLigne(ligne) {\n  if (ligne.price && typeof ligne.price === 'object') return ligne.price;\n  const details = ligne.pricing && ligne.pricing.price_details;\n  if (details && details.price && typeof details.price === 'object') return details.price;\n  return null;\n}\n\n// Une ligne de facture est-elle la partie récurrente d'un abonnement ?\nfunction ligneRecurrente(ligne) {\n  if (ligne.parent && ligne.parent.type) return ligne.parent.type === 'subscription_item_details';\n  if (ligne.type) return ligne.type === 'subscription';\n  const prix = prixDeLigne(ligne);\n  return Boolean((prix && prix.recurring) || ligne.plan);\n}\n\nfunction ligneProrata(ligne) {\n  const p = ligne.parent || {};\n  const d = p.subscription_item_details || p.invoice_item_details;\n  return Boolean((d && d.proration) || ligne.proration);\n}\n\nfunction moisDeLigne(ligne) {\n  const prix = prixDeLigne(ligne);\n  return moisDeRecurrence(prix && prix.recurring) ||\n    moisDeRecurrence(ligne.plan) ||\n    (ligneProrata(ligne) ? null : moisDePeriode(ligne.period));\n}\n\n// Type forcé à la main dans Stripe : metadata.type_paiement sur la ligne ou le prix\nfunction typeForce(ligne) {\n  const prix = prixDeLigne(ligne);\n  const brut = (ligne.metadata && ligne.metadata.type_paiement) || (prix && prix.metadata && prix.metadata.type_paiement);\n  const t = String(brut || '').trim().toLowerCase();\n  return TYPES_PAIEMENT.indexOf(t) >= 0 && t !== 'remboursement' && t !== 'litige' ? t : null;\n}\n\n// Montant réellement facturé pour une ligne (après remises), en centimes\nfunction montantNetLigne(ligne) {\n  let total = Number(ligne.amount || 0);\n  const credits = Array.isArray(ligne.pretax_credit_amounts) ? ligne.pretax_credit_amounts\n    : Array.isArray(ligne.discount_amounts) ? ligne.discount_amounts : [];\n  for (const c of credits) total -= Number(c.amount || 0);\n  return total;\n}\n\nfunction rowPaiement(champs) {\n  // Exactement les colonnes du contrat écrites par n8n (client_id est relié par la base)\n  return {\n    stripe_event_id: champs.stripe_event_id,\n    stripe_invoice_id: champs.stripe_invoice_id || null,\n    stripe_customer_id: champs.stripe_customer_id || null,\n    marche: champs.marche,\n    type: champs.type,\n    montant: champs.montant,\n    devise: champs.devise,\n    taux_eur: champs.taux_eur,\n    paye_le: champs.paye_le,\n    description: champs.description ? texte(champs.description, 300) : null,\n  };\n}\n\nfunction suffixeTest(objet) {\n  return objet && objet.livemode === false ? ' (test)' : '';\n}\n\n// ---------------------------------------------------------------------\n// invoice.paid : 1 à n paiements (abonnement ou pack, mise en place, ponctuel)\n// ---------------------------------------------------------------------\nfunction facturePayee(evenement, facture, contexte) {\n  const sortie = vide();\n  const client = normaliserClient(contexte.client);\n  const devise = deviseStripe(facture.currency);\n  const marche = choisirMarche(client, devise);\n  const nom = nomClient(client, facture);\n  const ref = facture.number || facture.id;\n\n  if (devise !== 'EUR' && devise !== 'USD') {\n    sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,\n      texte: texte('Paiement en ' + devise + ' ignoré (' + nom + ', facture ' + ref + ') : seuls EUR et USD comptent dans le cash.', 500) });\n    return sortie;\n  }\n\n  const paye = Number(facture.amount_paid || 0);\n  if (paye <= 0) {\n    sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,\n      texte: texte('Facture ' + ref + ' de ' + nom + ' à 0 (essai ou remise totale) : rien à ajouter au cash.', 500) });\n    return sortie;\n  }\n\n  const abonnement = abonnementDeFacture(facture);\n  const lignes = (facture.lines && facture.lines.data) || [];\n  // Durée de l'abonnement : la plus longue des lignes récurrentes hors prorata\n  let intervalle = 1;\n  for (const l of lignes) {\n    if (ligneRecurrente(l) && !ligneProrata(l)) intervalle = Math.max(intervalle, moisDeLigne(l) || 1);\n  }\n  const typeRecurrent = intervalle > 1 ? 'pack' : 'abonnement';\n\n  // Regroupe les lignes par type de paiement\n  const groupes = {};\n  const ordre = [];\n  for (const l of lignes) {\n    let type = typeForce(l);\n    if (!type) {\n      if (ligneRecurrente(l)) type = typeRecurrent;\n      else if (MOTIF_MISE_EN_PLACE.test(String(l.description || ''))) type = 'mise_en_place';\n      else if (abonnement && facture.billing_reason === 'subscription_create') type = 'mise_en_place';\n      else type = 'ponctuel';\n    }\n    if (!groupes[type]) { groupes[type] = { centimes: 0, descriptions: [] }; ordre.push(type); }\n    groupes[type].centimes += montantNetLigne(l);\n    if (l.description) groupes[type].descriptions.push(String(l.description));\n  }\n  if (!ordre.length) {\n    const type = abonnement ? typeRecurrent : 'ponctuel';\n    groupes[type] = { centimes: paye, descriptions: [facture.description || ''] };\n    ordre.push(type);\n  }\n\n  // Ligne principale : la partie récurrente, sinon la plus grosse\n  ordre.sort(function (a, b) {\n    const ra = a === 'abonnement' || a === 'pack' ? 1 : 0;\n    const rb = b === 'abonnement' || b === 'pack' ? 1 : 0;\n    return rb - ra || groupes[b].centimes - groupes[a].centimes;\n  });\n  // Le total suit toujours ce que Stripe a encaissé (taxes, solde client, lignes non listées)\n  const somme = ordre.reduce(function (s, t) { return s + groupes[t].centimes; }, 0);\n  groupes[ordre[0]].centimes += paye - somme;\n  // Cas rare (gros avoir client) : une seule ligne avec tout l'encaissé\n  if (ordre.some(function (t) { return groupes[t].centimes < 0; })) {\n    const principal = ordre[0];\n    groupes[principal] = { centimes: paye, descriptions: groupes[principal].descriptions };\n    ordre.length = 1;\n  }\n\n  const taux = tauxPour(devise, contexte);\n  const payeLe = dateIso(facture.status_transitions && facture.status_transitions.paid_at) || dateIso(evenement.created);\n  const morceaux = [];\n  ordre.forEach(function (type, i) {\n    const g = groupes[type];\n    if (g.centimes === 0) return;\n    const montant = enUnites(g.centimes);\n    sortie.paiements.push(rowPaiement({\n      stripe_event_id: i === 0 ? evenement.id : evenement.id + ':' + type,\n      stripe_invoice_id: facture.id,\n      stripe_customer_id: idDe(facture.customer),\n      marche: marche,\n      type: type,\n      montant: montant,\n      devise: devise,\n      taux_eur: taux,\n      paye_le: payeLe,\n      description: 'Facture ' + ref + ' · ' + (g.descriptions.join(' + ') || type.replace(/_/g, ' ')) + suffixeTest(facture),\n    }));\n    morceaux.push(montantLisible(montant, devise) + (type === 'abonnement' ? '' : ' ' + type.replace(/_/g, ' ')));\n  });\n\n  const total = enUnites(paye);\n  sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,\n    texte: texte('Paiement reçu : ' + nom + ', ' + montantLisible(total, devise) +\n      (morceaux.length > 1 ? ' (' + morceaux.join(' + ') + ')' : sortie.paiements[0] && sortie.paiements[0].type === 'pack' ? ' (pack ' + intervalle + ' mois)' : '') +\n      '.' + suffixeTest(facture), 500) });\n  return sortie;\n}\n\n// ---------------------------------------------------------------------\n// invoice.payment_failed : une action « relance_impaye » à valider, rien d'autre\n// (la base écrit elle-même la ligne de journal « À valider : … »)\n// ---------------------------------------------------------------------\nfunction factureImpayee(evenement, facture, contexte) {\n  const sortie = vide();\n  const client = normaliserClient(contexte.client);\n  const devise = deviseStripe(facture.currency);\n  const marche = choisirMarche(client, devise);\n  const nom = nomClient(client, facture);\n  const montant = enUnites(facture.amount_remaining || facture.amount_due || 0);\n  const tentative = Number(facture.attempt_count || 0);\n  sortie.actions.push({\n    marche: marche,\n    agent: AGENT_ARGENT,\n    type_action: 'relance_impaye',\n    titre: texte('Relancer ' + nom + ' : facture ' + (facture.number || facture.id) + ' impayée (' +\n      montantLisible(montant, devise) + ')' + (tentative > 1 ? ', ' + tentative + 'ᵉ échec' : '') + suffixeTest(facture), 200),\n    details: {\n      verrou: true,\n      stripe_event_id: evenement.id,\n      stripe_invoice_id: facture.id,\n      stripe_customer_id: idDe(facture.customer),\n      stripe_subscription_id: abonnementDeFacture(facture),\n      client: nom,\n      email: (client && client.email) || facture.customer_email || null,\n      montant: montant,\n      devise: devise,\n      tentative: tentative || null,\n      prochaine_tentative: dateIso(facture.next_payment_attempt),\n      lien_facture: facture.hosted_invoice_url || null,\n    },\n  });\n  return sortie;\n}\n\n// ---------------------------------------------------------------------\n// customer.subscription.* : une ligne abonnements (upsert sur stripe_subscription_id)\n// ---------------------------------------------------------------------\nfunction finDePeriode(abonnement) {\n  if (abonnement.current_period_end) return abonnement.current_period_end;\n  const items = (abonnement.items && abonnement.items.data) || [];\n  let fin = null;\n  for (const it of items) {\n    if (it.current_period_end && (fin === null || it.current_period_end < fin)) fin = it.current_period_end;\n  }\n  return fin;\n}\n\nfunction finEngagement(abonnement) {\n  const meta = abonnement.metadata || {};\n  if (meta.fin_engagement && /^\\d{4}-\\d{2}-\\d{2}/.test(String(meta.fin_engagement))) {\n    const d = new Date(String(meta.fin_engagement));\n    if (!Number.isNaN(d.getTime())) return d.toISOString();\n  }\n  if (!abonnement.start_date) return null;\n  const mois = parseInt(meta.engagement_mois, 10);\n  return ajouterMois(abonnement.start_date, Number.isFinite(mois) && mois >= 0 ? mois : ENGAGEMENT_MOIS_DEFAUT);\n}\n\nfunction ligneAbonnement(abonnement, marche) {\n  const items = (abonnement.items && abonnement.items.data) || [];\n  let centimes = 0;\n  let intervalle = null;\n  for (const it of items) {\n    const prix = it.price || it.plan || {};\n    const unitaire = prix.unit_amount !== undefined && prix.unit_amount !== null ? Number(prix.unit_amount)\n      : prix.amount !== undefined && prix.amount !== null ? Number(prix.amount)\n        : Number(prix.unit_amount_decimal || 0);\n    centimes += unitaire * (it.quantity === undefined || it.quantity === null ? 1 : Number(it.quantity));\n    intervalle = intervalle || moisDeRecurrence(prix.recurring) || moisDeRecurrence(it.plan);\n  }\n  const statut = String(abonnement.status || 'incomplete');\n  const termine = statut === 'canceled' || statut === 'incomplete_expired';\n  const finPeriode = finDePeriode(abonnement);\n  let annuleLe = null;\n  if (termine) annuleLe = dateIso(abonnement.ended_at) || dateIso(abonnement.canceled_at);\n  else if (abonnement.cancel_at) annuleLe = dateIso(abonnement.cancel_at);\n  else if (abonnement.cancel_at_period_end) annuleLe = dateIso(finPeriode);\n  // Exactement les colonnes du contrat écrites par n8n (client_id est relié par la base)\n  return {\n    stripe_subscription_id: abonnement.id,\n    stripe_customer_id: idDe(abonnement.customer),\n    marche: marche,\n    statut: statut,\n    montant: enUnites(Math.round(centimes)),\n    devise: deviseStripe(abonnement.currency),\n    intervalle_mois: intervalle || 1,\n    debut: dateIso(abonnement.start_date),\n    fin_engagement: finEngagement(abonnement),\n    prochaine_facture: termine ? null : dateIso(finPeriode),\n    annule_le: annuleLe,\n  };\n}\n\nfunction rythme(ligne) {\n  return ligne.intervalle_mois > 1 ? ' tous les ' + ligne.intervalle_mois + ' mois' : '/mois';\n}\n\nfunction evenementAbonnement(evenement, abonnement, contexte) {\n  const sortie = vide();\n  const client = normaliserClient(contexte.client);\n  const devise = deviseStripe(abonnement.currency);\n  const marche = choisirMarche(client, devise);\n  const nom = nomClient(client, abonnement);\n  const ligne = ligneAbonnement(abonnement, marche);\n  sortie.abonnements.push(ligne);\n\n  const prix = montantLisible(ligne.montant, ligne.devise) + rythme(ligne);\n  const test = suffixeTest(abonnement);\n  const avant = (evenement.data && evenement.data.previous_attributes) || {};\n  let phrase = null;\n  if (evenement.type === 'customer.subscription.created') {\n    phrase = (ligne.intervalle_mois > 1 ? 'Nouveau pack ' + ligne.intervalle_mois + ' mois : ' : 'Nouvel abonnement : ') + nom + ', ' + prix + '.';\n  } else if (evenement.type === 'customer.subscription.deleted') {\n    phrase = 'Abonnement terminé : ' + nom + ' (' + prix + ').';\n  } else {\n    if ('cancel_at' in avant || 'cancel_at_period_end' in avant) {\n      if (ligne.annule_le && ligne.statut !== 'canceled') {\n        const fin = abonnement.cancel_at || (abonnement.cancel_at_period_end ? finDePeriode(abonnement) : null);\n        phrase = 'Résiliation programmée : ' + nom + ', fin le ' + dateLisible(fin, marche) + '.';\n      } else if (!ligne.annule_le) {\n        phrase = 'Résiliation annulée : ' + nom + ' continue (' + prix + ').';\n      }\n    }\n    if (!phrase && 'status' in avant && avant.status !== ligne.statut) {\n      if (ligne.statut === 'active') phrase = 'Abonnement actif : ' + nom + ', ' + prix + '.';\n      else if (ligne.statut === 'past_due') phrase = 'Abonnement en retard de paiement : ' + nom + '.';\n      else if (ligne.statut === 'canceled') phrase = 'Abonnement arrêté : ' + nom + '.';\n      else phrase = 'Abonnement ' + nom + ' : statut « ' + ligne.statut + ' ».';\n    }\n  }\n  if (phrase) sortie.journal.push({ marche: marche, agent: AGENT_ARGENT, texte: texte(phrase + test, 500) });\n  return sortie;\n}\n\n// ---------------------------------------------------------------------\n// charge.refunded : un paiement négatif pour la part remboursée par cet événement\n// ---------------------------------------------------------------------\nfunction chargeRemboursee(evenement, charge, contexte) {\n  const sortie = vide();\n  const client = normaliserClient(contexte.client);\n  const devise = deviseStripe(charge.currency);\n  const marche = choisirMarche(client, devise);\n  const nom = nomClient(client, charge);\n  const avant = (evenement.data && evenement.data.previous_attributes) || {};\n  // amount_refunded est cumulé : on ne garde que ce que cet événement ajoute\n  const dejaRembourse = avant.amount_refunded !== undefined ? Number(avant.amount_refunded || 0) : 0;\n  const centimes = Number(charge.amount_refunded || 0) - dejaRembourse;\n  if (centimes <= 0) return sortie;\n  if (devise !== 'EUR' && devise !== 'USD') {\n    sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,\n      texte: texte('Remboursement en ' + devise + ' ignoré (' + nom + ') : seuls EUR et USD comptent dans le cash.', 500) });\n    return sortie;\n  }\n  const montant = enUnites(centimes);\n  const total = Number(charge.amount_refunded || 0) >= Number(charge.amount || 0);\n  sortie.paiements.push(rowPaiement({\n    stripe_event_id: evenement.id,\n    stripe_invoice_id: idDe(charge.invoice),\n    stripe_customer_id: idDe(charge.customer) || (client && client.id) || null,\n    marche: marche,\n    type: 'remboursement',\n    montant: -montant,\n    devise: devise,\n    taux_eur: tauxPour(devise, contexte),\n    paye_le: dateIso(evenement.created) || dateIso(charge.created),\n    description: (total ? 'Remboursement total' : 'Remboursement partiel') + ' de ' + charge.id +\n      (charge.description ? ' · ' + charge.description : '') + suffixeTest(charge),\n  }));\n  sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,\n    texte: texte('Remboursement' + (total ? '' : ' partiel') + ' : ' + nom + ', −' + montantLisible(montant, devise) + '.' + suffixeTest(charge), 500) });\n  return sortie;\n}\n\n// ---------------------------------------------------------------------\n// charge.dispute.created : un paiement négatif (Stripe retient le montant contesté)\n// ---------------------------------------------------------------------\nfunction litigeOuvert(evenement, litige, contexte) {\n  const sortie = vide();\n  const client = normaliserClient(contexte.client);\n  const devise = deviseStripe(litige.currency);\n  const marche = choisirMarche(client, devise);\n  const nom = nomClient(client, litige);\n  const centimes = Number(litige.amount || 0);\n  if (centimes <= 0) return sortie;\n  if (devise !== 'EUR' && devise !== 'USD') {\n    sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,\n      texte: texte('Litige en ' + devise + ' ignoré (' + nom + ') : seuls EUR et USD comptent dans le cash.', 500) });\n    return sortie;\n  }\n  const montant = enUnites(centimes);\n  const echeance = litige.evidence_details && litige.evidence_details.due_by;\n  sortie.paiements.push(rowPaiement({\n    stripe_event_id: evenement.id,\n    stripe_invoice_id: null,\n    stripe_customer_id: (client && client.id) || null,\n    marche: marche,\n    type: 'litige',\n    montant: -montant,\n    devise: devise,\n    taux_eur: tauxPour(devise, contexte),\n    paye_le: dateIso(litige.created) || dateIso(evenement.created),\n    description: 'Litige ' + litige.id + ' sur ' + idDe(litige.charge) + (litige.reason ? ' · motif : ' + litige.reason : '') + suffixeTest(litige),\n  }));\n  sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,\n    texte: texte('Litige ouvert : ' + nom + ', −' + montantLisible(montant, devise) + ' retenus par Stripe' +\n      (echeance ? '. Preuves à envoyer avant le ' + dateLisible(echeance, marche) : '') + '.' + suffixeTest(litige), 500) });\n  return sortie;\n}\n\n// ---------------------------------------------------------------------\n// Point d'entrée\n// ---------------------------------------------------------------------\nfunction transformerEvenementStripe(evenement, contexte) {\n  const ctx = contexte || {};\n  if (!evenement || typeof evenement !== 'object' || !evenement.data || !evenement.data.object) return vide();\n  const objet = evenement.data.object;\n  switch (evenement.type) {\n    case 'invoice.paid': return facturePayee(evenement, objet, ctx);\n    case 'invoice.payment_failed': return factureImpayee(evenement, objet, ctx);\n    case 'customer.subscription.created':\n    case 'customer.subscription.updated':\n    case 'customer.subscription.deleted': return evenementAbonnement(evenement, objet, ctx);\n    case 'charge.refunded': return chargeRemboursee(evenement, objet, ctx);\n    case 'charge.dispute.created': return litigeOuvert(evenement, objet, ctx);\n    default: return vide();\n  }\n}\n\nif (typeof module !== 'undefined' && module.exports) {\n  module.exports = {\n    transformerEvenementStripe,\n    cibleClientStripe,\n    normaliserClient,\n    choisirMarche,\n    lireTauxBce,\n    lireTauxSecours,\n    montantLisible,\n    EVENEMENTS_GERES,\n    TYPES_PAIEMENT,\n    TAUX_USD_EUR_DERNIER_RECOURS,\n    ENGAGEMENT_MOIS_DEFAUT,\n  };\n}\n\n// ---- Lien avec le workflow n8n (ajouté par build.js) ----\nfunction sortieDe(nom) {\n  try {\n    const n = $(nom);\n    if (!n.isExecuted) return null;\n    const item = n.first();\n    return item ? item.json : null;\n  } catch (erreur) {\n    return null;\n  }\n}\n\nconst evenement = $('Stripe').first().json;\nreturn [{ json: { evenement: evenement.id, type: evenement.type, urlClient: cibleClientStripe(evenement) || '' } }];\n"
+      },
+      "id": "02522832-aa9d-5349-8240-8eec5170792a",
+      "name": "Préparer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9cc907a1-d82c-5dbf-9899-12526815ea10",
+              "leftValue": "={{ $json.urlClient }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "35fdbe74-3210-5954-9d17-434d270745fb",
+      "name": "Client à lire ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.urlClient }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "f91ca061-99ed-5962-9c52-fb1cc9f9dd21",
+      "name": "Lire le client Stripe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        -120
+      ],
+      "credentials": {
+        "stripeApi": {
+          "id": null,
+          "name": "Stripe J-Square"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "'use strict';\n// =====================================================================\n// stripe-mapping.js : un événement Stripe devient des lignes Supabase.\n// Contrat : cockpit/CONTRAT-TECHNIQUE.md, sections 1.2 et 4.\n//\n// Fonction pure (aucun appel réseau, aucune horloge) :\n//   transformerEvenementStripe(evenement, contexte)\n//     -> { paiements: [...], abonnements: [...], journal: [...], actions: [...] }\n//   contexte = { client, tauxUsdEur, sourceTaux }\n//     client      : le client Stripe lu par n8n (ou une charge avec le client\n//                   déplié, pour un litige), sinon null\n//     tauxUsdEur  : euros pour 1 dollar (BCE du jour, ou réglage de secours)\n//\n// Ce fichier est collé tel quel dans le nœud Code de n8n par build.js.\n// Il gère les deux formes connues des factures Stripe :\n//   - ancienne (API jusqu'à 2025-02-24.acacia) : invoice.subscription,\n//     lines.data[].price.recurring, lines.data[].type ;\n//   - récente (2025-03-31.basil et après) : invoice.parent.subscription_details,\n//     lines.data[].parent, lines.data[].pricing, lines.data[].period.\n// =====================================================================\n\n// Taux utilisé seulement si n8n n'a ni le taux BCE ni le réglage « change »\nconst TAUX_USD_EUR_DERNIER_RECOURS = 0.891;\n// Engagement par défaut quand l'abonnement Stripe ne précise rien (cahier des charges : 3 mois)\nconst ENGAGEMENT_MOIS_DEFAUT = 3;\n// Types de paiement acceptés par la table paiements\nconst TYPES_PAIEMENT = ['abonnement', 'mise_en_place', 'pack', 'ponctuel', 'remboursement', 'litige'];\n// Une ligne ponctuelle dont la description dit « mise en place » devient mise_en_place\nconst MOTIF_MISE_EN_PLACE = /mise en place|mise-en-place|installation|setup|onboarding|frais de lancement/i;\n// Agent qui signe les lignes de journal et les actions liées à l'argent\nconst AGENT_ARGENT = 'finance';\n\nconst EVENEMENTS_GERES = [\n  'invoice.paid',\n  'invoice.payment_failed',\n  'customer.subscription.created',\n  'customer.subscription.updated',\n  'customer.subscription.deleted',\n  'charge.refunded',\n  'charge.dispute.created',\n];\n\n// ---------------------------------------------------------------------\n// Petits outils\n// ---------------------------------------------------------------------\nfunction vide() {\n  return { paiements: [], abonnements: [], journal: [], actions: [] };\n}\n\nfunction enUnites(centimes) {\n  return Math.round(Number(centimes || 0)) / 100;\n}\n\nfunction arrondi(n, decimales) {\n  const f = Math.pow(10, decimales);\n  return Math.round(n * f) / f;\n}\n\nfunction dateIso(secondes) {\n  if (secondes === null || secondes === undefined || secondes === '') return null;\n  const n = Number(secondes);\n  if (!Number.isFinite(n) || n <= 0) return null;\n  return new Date(n * 1000).toISOString();\n}\n\nfunction idDe(valeur) {\n  if (!valeur) return null;\n  if (typeof valeur === 'string') return valeur;\n  if (typeof valeur === 'object' && typeof valeur.id === 'string') return valeur.id;\n  return null;\n}\n\nfunction texte(valeur, max) {\n  const t = String(valeur === null || valeur === undefined ? '' : valeur).replace(/\\s+/g, ' ').trim();\n  return t.length > max ? t.slice(0, max - 1) + '…' : t;\n}\n\nfunction deviseStripe(code) {\n  return String(code || '').toUpperCase();\n}\n\n// 1280 -> « 1 280 € » ; 997.5 -> « 997,50 $ »\nfunction montantLisible(montant, devise) {\n  const entier = Math.abs(montant % 1) < 0.005;\n  const nombre = new Intl.NumberFormat('fr-FR', {\n    minimumFractionDigits: entier ? 0 : 2,\n    maximumFractionDigits: 2,\n  }).format(montant);\n  const symbole = devise === 'EUR' ? '€' : devise === 'USD' ? '$' : devise;\n  return nombre + ' ' + symbole;\n}\n\nfunction fuseauMarche(marche) {\n  return marche === 'us' ? 'America/New_York' : 'Europe/Paris';\n}\n\n// 1767484800 -> « 4 janvier 2027 » à l'heure du marché\nfunction dateLisible(secondes, marche) {\n  if (!secondes) return '';\n  return new Intl.DateTimeFormat('fr-FR', {\n    day: 'numeric', month: 'long', year: 'numeric', timeZone: fuseauMarche(marche),\n  }).format(new Date(Number(secondes) * 1000));\n}\n\n// Ajoute n mois à une date Stripe (secondes), en gardant le jour si possible\nfunction ajouterMois(secondes, n) {\n  const d = new Date(Number(secondes) * 1000);\n  const jour = d.getUTCDate();\n  const cible = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1,\n    d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()));\n  const dernierJour = new Date(Date.UTC(cible.getUTCFullYear(), cible.getUTCMonth() + 1, 0)).getUTCDate();\n  cible.setUTCDate(Math.min(jour, dernierJour));\n  return cible.toISOString();\n}\n\n// ---------------------------------------------------------------------\n// Client Stripe, marché et taux de change\n// ---------------------------------------------------------------------\n\n// Ce que n8n doit lire chez Stripe pour connaître le client (null : rien à lire)\nfunction cibleClientStripe(evenement) {\n  const objet = (evenement && evenement.data && evenement.data.object) || {};\n  if (evenement && evenement.type === 'charge.dispute.created') {\n    const charge = idDe(objet.charge);\n    return charge ? 'https://api.stripe.com/v1/charges/' + encodeURIComponent(charge) + '?expand[]=customer' : null;\n  }\n  const client = idDe(objet.customer);\n  return client ? 'https://api.stripe.com/v1/customers/' + encodeURIComponent(client) : null;\n}\n\n// Réponse de Stripe (client, ou charge avec client déplié) -> client Stripe ou null\nfunction normaliserClient(reponse) {\n  if (!reponse || typeof reponse !== 'object' || reponse.error) return null;\n  if (reponse.object === 'customer') return reponse.deleted ? null : reponse;\n  if (reponse.object === 'charge' && reponse.customer && typeof reponse.customer === 'object') {\n    return normaliserClient(reponse.customer);\n  }\n  return null;\n}\n\nfunction marcheDuClient(client) {\n  const brut = client && client.metadata && client.metadata.marche;\n  const m = String(brut || '').trim().toLowerCase();\n  return m === 'fr' || m === 'us' ? m : null;\n}\n\n// metadata.marche du client Stripe, sinon la devise (USD donne us)\nfunction choisirMarche(client, devise) {\n  return marcheDuClient(client) || (devise === 'USD' ? 'us' : 'fr');\n}\n\nfunction nomClient(client, objet) {\n  return texte(\n    (client && (client.name || client.email)) ||\n    (objet && (objet.customer_name || objet.customer_email)) ||\n    idDe(objet && objet.customer) ||\n    'client inconnu', 80);\n}\n\n// Taux BCE du jour : le XML donne des dollars pour 1 euro, on veut des euros pour 1 dollar\nfunction lireTauxBce(xml) {\n  if (typeof xml !== 'string') return null;\n  const m = xml.match(/currency=['\"]USD['\"]\\s+rate=['\"]([0-9.]+)['\"]/);\n  if (!m) return null;\n  const dollarsPourUnEuro = Number(m[1]);\n  if (!Number.isFinite(dollarsPourUnEuro) || dollarsPourUnEuro <= 0) return null;\n  const jour = (xml.match(/time=['\"](\\d{4}-\\d{2}-\\d{2})['\"]/) || [])[1] || null;\n  return { taux: arrondi(1 / dollarsPourUnEuro, 6), source: 'BCE ' + (jour || 'du jour') };\n}\n\n// Réglage « change » lu dans Supabase : [{ valeur: { usd_eur, source } }] ou { valeur: … }\nfunction lireTauxSecours(reponse) {\n  const ligne = Array.isArray(reponse) ? reponse[0] : reponse;\n  const valeur = ligne && (ligne.valeur || ligne);\n  const taux = valeur ? Number(valeur.usd_eur) : NaN;\n  if (!Number.isFinite(taux) || taux <= 0) return null;\n  return { taux: taux, source: 'réglage ' + (valeur.source || 'change') };\n}\n\nfunction tauxPour(devise, contexte) {\n  if (devise === 'EUR') return 1;\n  const t = Number(contexte && contexte.tauxUsdEur);\n  return Number.isFinite(t) && t > 0 ? arrondi(t, 6) : TAUX_USD_EUR_DERNIER_RECOURS;\n}\n\n// ---------------------------------------------------------------------\n// Factures : lecture des deux formes connues\n// ---------------------------------------------------------------------\nfunction abonnementDeFacture(facture) {\n  const parent = facture.parent;\n  if (parent && parent.subscription_details) return idDe(parent.subscription_details.subscription);\n  if (facture.subscription) return idDe(facture.subscription);\n  const lignes = (facture.lines && facture.lines.data) || [];\n  for (const l of lignes) {\n    const p = l.parent || {};\n    const s = (p.subscription_item_details && p.subscription_item_details.subscription) ||\n      (p.invoice_item_details && p.invoice_item_details.subscription) || l.subscription;\n    if (s) return idDe(s);\n  }\n  return null;\n}\n\n// Durée de récurrence d'un prix Stripe, en mois\nfunction moisDeRecurrence(recurrence) {\n  if (!recurrence || !recurrence.interval) return null;\n  const n = Number(recurrence.interval_count) || 1;\n  switch (recurrence.interval) {\n    case 'month': return n;\n    case 'year': return 12 * n;\n    case 'week': return Math.max(1, Math.round((7 * n) / 30.44));\n    case 'day': return Math.max(1, Math.round(n / 30.44));\n    default: return null;\n  }\n}\n\n// Durée d'une période de facturation (secondes Stripe), en mois\nfunction moisDePeriode(periode) {\n  if (!periode || !periode.start || !periode.end || periode.end <= periode.start) return null;\n  return Math.max(1, Math.round((periode.end - periode.start) / 86400 / 30.44));\n}\n\nfunction prixDeLigne(ligne) {\n  if (ligne.price && typeof ligne.price === 'object') return ligne.price;\n  const details = ligne.pricing && ligne.pricing.price_details;\n  if (details && details.price && typeof details.price === 'object') return details.price;\n  return null;\n}\n\n// Une ligne de facture est-elle la partie récurrente d'un abonnement ?\nfunction ligneRecurrente(ligne) {\n  if (ligne.parent && ligne.parent.type) return ligne.parent.type === 'subscription_item_details';\n  if (ligne.type) return ligne.type === 'subscription';\n  const prix = prixDeLigne(ligne);\n  return Boolean((prix && prix.recurring) || ligne.plan);\n}\n\nfunction ligneProrata(ligne) {\n  const p = ligne.parent || {};\n  const d = p.subscription_item_details || p.invoice_item_details;\n  return Boolean((d && d.proration) || ligne.proration);\n}\n\nfunction moisDeLigne(ligne) {\n  const prix = prixDeLigne(ligne);\n  return moisDeRecurrence(prix && prix.recurring) ||\n    moisDeRecurrence(ligne.plan) ||\n    (ligneProrata(ligne) ? null : moisDePeriode(ligne.period));\n}\n\n// Type forcé à la main dans Stripe : metadata.type_paiement sur la ligne ou le prix\nfunction typeForce(ligne) {\n  const prix = prixDeLigne(ligne);\n  const brut = (ligne.metadata && ligne.metadata.type_paiement) || (prix && prix.metadata && prix.metadata.type_paiement);\n  const t = String(brut || '').trim().toLowerCase();\n  return TYPES_PAIEMENT.indexOf(t) >= 0 && t !== 'remboursement' && t !== 'litige' ? t : null;\n}\n\n// Montant réellement facturé pour une ligne (après remises), en centimes\nfunction montantNetLigne(ligne) {\n  let total = Number(ligne.amount || 0);\n  const credits = Array.isArray(ligne.pretax_credit_amounts) ? ligne.pretax_credit_amounts\n    : Array.isArray(ligne.discount_amounts) ? ligne.discount_amounts : [];\n  for (const c of credits) total -= Number(c.amount || 0);\n  return total;\n}\n\nfunction rowPaiement(champs) {\n  // Exactement les colonnes du contrat écrites par n8n (client_id est relié par la base)\n  return {\n    stripe_event_id: champs.stripe_event_id,\n    stripe_invoice_id: champs.stripe_invoice_id || null,\n    stripe_customer_id: champs.stripe_customer_id || null,\n    marche: champs.marche,\n    type: champs.type,\n    montant: champs.montant,\n    devise: champs.devise,\n    taux_eur: champs.taux_eur,\n    paye_le: champs.paye_le,\n    description: champs.description ? texte(champs.description, 300) : null,\n  };\n}\n\nfunction suffixeTest(objet) {\n  return objet && objet.livemode === false ? ' (test)' : '';\n}\n\n// ---------------------------------------------------------------------\n// invoice.paid : 1 à n paiements (abonnement ou pack, mise en place, ponctuel)\n// ---------------------------------------------------------------------\nfunction facturePayee(evenement, facture, contexte) {\n  const sortie = vide();\n  const client = normaliserClient(contexte.client);\n  const devise = deviseStripe(facture.currency);\n  const marche = choisirMarche(client, devise);\n  const nom = nomClient(client, facture);\n  const ref = facture.number || facture.id;\n\n  if (devise !== 'EUR' && devise !== 'USD') {\n    sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,\n      texte: texte('Paiement en ' + devise + ' ignoré (' + nom + ', facture ' + ref + ') : seuls EUR et USD comptent dans le cash.', 500) });\n    return sortie;\n  }\n\n  const paye = Number(facture.amount_paid || 0);\n  if (paye <= 0) {\n    sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,\n      texte: texte('Facture ' + ref + ' de ' + nom + ' à 0 (essai ou remise totale) : rien à ajouter au cash.', 500) });\n    return sortie;\n  }\n\n  const abonnement = abonnementDeFacture(facture);\n  const lignes = (facture.lines && facture.lines.data) || [];\n  // Durée de l'abonnement : la plus longue des lignes récurrentes hors prorata\n  let intervalle = 1;\n  for (const l of lignes) {\n    if (ligneRecurrente(l) && !ligneProrata(l)) intervalle = Math.max(intervalle, moisDeLigne(l) || 1);\n  }\n  const typeRecurrent = intervalle > 1 ? 'pack' : 'abonnement';\n\n  // Regroupe les lignes par type de paiement\n  const groupes = {};\n  const ordre = [];\n  for (const l of lignes) {\n    let type = typeForce(l);\n    if (!type) {\n      if (ligneRecurrente(l)) type = typeRecurrent;\n      else if (MOTIF_MISE_EN_PLACE.test(String(l.description || ''))) type = 'mise_en_place';\n      else if (abonnement && facture.billing_reason === 'subscription_create') type = 'mise_en_place';\n      else type = 'ponctuel';\n    }\n    if (!groupes[type]) { groupes[type] = { centimes: 0, descriptions: [] }; ordre.push(type); }\n    groupes[type].centimes += montantNetLigne(l);\n    if (l.description) groupes[type].descriptions.push(String(l.description));\n  }\n  if (!ordre.length) {\n    const type = abonnement ? typeRecurrent : 'ponctuel';\n    groupes[type] = { centimes: paye, descriptions: [facture.description || ''] };\n    ordre.push(type);\n  }\n\n  // Ligne principale : la partie récurrente, sinon la plus grosse\n  ordre.sort(function (a, b) {\n    const ra = a === 'abonnement' || a === 'pack' ? 1 : 0;\n    const rb = b === 'abonnement' || b === 'pack' ? 1 : 0;\n    return rb - ra || groupes[b].centimes - groupes[a].centimes;\n  });\n  // Le total suit toujours ce que Stripe a encaissé (taxes, solde client, lignes non listées)\n  const somme = ordre.reduce(function (s, t) { return s + groupes[t].centimes; }, 0);\n  groupes[ordre[0]].centimes += paye - somme;\n  // Cas rare (gros avoir client) : une seule ligne avec tout l'encaissé\n  if (ordre.some(function (t) { return groupes[t].centimes < 0; })) {\n    const principal = ordre[0];\n    groupes[principal] = { centimes: paye, descriptions: groupes[principal].descriptions };\n    ordre.length = 1;\n  }\n\n  const taux = tauxPour(devise, contexte);\n  const payeLe = dateIso(facture.status_transitions && facture.status_transitions.paid_at) || dateIso(evenement.created);\n  const morceaux = [];\n  ordre.forEach(function (type, i) {\n    const g = groupes[type];\n    if (g.centimes === 0) return;\n    const montant = enUnites(g.centimes);\n    sortie.paiements.push(rowPaiement({\n      stripe_event_id: i === 0 ? evenement.id : evenement.id + ':' + type,\n      stripe_invoice_id: facture.id,\n      stripe_customer_id: idDe(facture.customer),\n      marche: marche,\n      type: type,\n      montant: montant,\n      devise: devise,\n      taux_eur: taux,\n      paye_le: payeLe,\n      description: 'Facture ' + ref + ' · ' + (g.descriptions.join(' + ') || type.replace(/_/g, ' ')) + suffixeTest(facture),\n    }));\n    morceaux.push(montantLisible(montant, devise) + (type === 'abonnement' ? '' : ' ' + type.replace(/_/g, ' ')));\n  });\n\n  const total = enUnites(paye);\n  sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,\n    texte: texte('Paiement reçu : ' + nom + ', ' + montantLisible(total, devise) +\n      (morceaux.length > 1 ? ' (' + morceaux.join(' + ') + ')' : sortie.paiements[0] && sortie.paiements[0].type === 'pack' ? ' (pack ' + intervalle + ' mois)' : '') +\n      '.' + suffixeTest(facture), 500) });\n  return sortie;\n}\n\n// ---------------------------------------------------------------------\n// invoice.payment_failed : une action « relance_impaye » à valider, rien d'autre\n// (la base écrit elle-même la ligne de journal « À valider : … »)\n// ---------------------------------------------------------------------\nfunction factureImpayee(evenement, facture, contexte) {\n  const sortie = vide();\n  const client = normaliserClient(contexte.client);\n  const devise = deviseStripe(facture.currency);\n  const marche = choisirMarche(client, devise);\n  const nom = nomClient(client, facture);\n  const montant = enUnites(facture.amount_remaining || facture.amount_due || 0);\n  const tentative = Number(facture.attempt_count || 0);\n  sortie.actions.push({\n    marche: marche,\n    agent: AGENT_ARGENT,\n    type_action: 'relance_impaye',\n    titre: texte('Relancer ' + nom + ' : facture ' + (facture.number || facture.id) + ' impayée (' +\n      montantLisible(montant, devise) + ')' + (tentative > 1 ? ', ' + tentative + 'ᵉ échec' : '') + suffixeTest(facture), 200),\n    details: {\n      verrou: true,\n      stripe_event_id: evenement.id,\n      stripe_invoice_id: facture.id,\n      stripe_customer_id: idDe(facture.customer),\n      stripe_subscription_id: abonnementDeFacture(facture),\n      client: nom,\n      email: (client && client.email) || facture.customer_email || null,\n      montant: montant,\n      devise: devise,\n      tentative: tentative || null,\n      prochaine_tentative: dateIso(facture.next_payment_attempt),\n      lien_facture: facture.hosted_invoice_url || null,\n    },\n  });\n  return sortie;\n}\n\n// ---------------------------------------------------------------------\n// customer.subscription.* : une ligne abonnements (upsert sur stripe_subscription_id)\n// ---------------------------------------------------------------------\nfunction finDePeriode(abonnement) {\n  if (abonnement.current_period_end) return abonnement.current_period_end;\n  const items = (abonnement.items && abonnement.items.data) || [];\n  let fin = null;\n  for (const it of items) {\n    if (it.current_period_end && (fin === null || it.current_period_end < fin)) fin = it.current_period_end;\n  }\n  return fin;\n}\n\nfunction finEngagement(abonnement) {\n  const meta = abonnement.metadata || {};\n  if (meta.fin_engagement && /^\\d{4}-\\d{2}-\\d{2}/.test(String(meta.fin_engagement))) {\n    const d = new Date(String(meta.fin_engagement));\n    if (!Number.isNaN(d.getTime())) return d.toISOString();\n  }\n  if (!abonnement.start_date) return null;\n  const mois = parseInt(meta.engagement_mois, 10);\n  return ajouterMois(abonnement.start_date, Number.isFinite(mois) && mois >= 0 ? mois : ENGAGEMENT_MOIS_DEFAUT);\n}\n\nfunction ligneAbonnement(abonnement, marche) {\n  const items = (abonnement.items && abonnement.items.data) || [];\n  let centimes = 0;\n  let intervalle = null;\n  for (const it of items) {\n    const prix = it.price || it.plan || {};\n    const unitaire = prix.unit_amount !== undefined && prix.unit_amount !== null ? Number(prix.unit_amount)\n      : prix.amount !== undefined && prix.amount !== null ? Number(prix.amount)\n        : Number(prix.unit_amount_decimal || 0);\n    centimes += unitaire * (it.quantity === undefined || it.quantity === null ? 1 : Number(it.quantity));\n    intervalle = intervalle || moisDeRecurrence(prix.recurring) || moisDeRecurrence(it.plan);\n  }\n  const statut = String(abonnement.status || 'incomplete');\n  const termine = statut === 'canceled' || statut === 'incomplete_expired';\n  const finPeriode = finDePeriode(abonnement);\n  let annuleLe = null;\n  if (termine) annuleLe = dateIso(abonnement.ended_at) || dateIso(abonnement.canceled_at);\n  else if (abonnement.cancel_at) annuleLe = dateIso(abonnement.cancel_at);\n  else if (abonnement.cancel_at_period_end) annuleLe = dateIso(finPeriode);\n  // Exactement les colonnes du contrat écrites par n8n (client_id est relié par la base)\n  return {\n    stripe_subscription_id: abonnement.id,\n    stripe_customer_id: idDe(abonnement.customer),\n    marche: marche,\n    statut: statut,\n    montant: enUnites(Math.round(centimes)),\n    devise: deviseStripe(abonnement.currency),\n    intervalle_mois: intervalle || 1,\n    debut: dateIso(abonnement.start_date),\n    fin_engagement: finEngagement(abonnement),\n    prochaine_facture: termine ? null : dateIso(finPeriode),\n    annule_le: annuleLe,\n  };\n}\n\nfunction rythme(ligne) {\n  return ligne.intervalle_mois > 1 ? ' tous les ' + ligne.intervalle_mois + ' mois' : '/mois';\n}\n\nfunction evenementAbonnement(evenement, abonnement, contexte) {\n  const sortie = vide();\n  const client = normaliserClient(contexte.client);\n  const devise = deviseStripe(abonnement.currency);\n  const marche = choisirMarche(client, devise);\n  const nom = nomClient(client, abonnement);\n  const ligne = ligneAbonnement(abonnement, marche);\n  sortie.abonnements.push(ligne);\n\n  const prix = montantLisible(ligne.montant, ligne.devise) + rythme(ligne);\n  const test = suffixeTest(abonnement);\n  const avant = (evenement.data && evenement.data.previous_attributes) || {};\n  let phrase = null;\n  if (evenement.type === 'customer.subscription.created') {\n    phrase = (ligne.intervalle_mois > 1 ? 'Nouveau pack ' + ligne.intervalle_mois + ' mois : ' : 'Nouvel abonnement : ') + nom + ', ' + prix + '.';\n  } else if (evenement.type === 'customer.subscription.deleted') {\n    phrase = 'Abonnement terminé : ' + nom + ' (' + prix + ').';\n  } else {\n    if ('cancel_at' in avant || 'cancel_at_period_end' in avant) {\n      if (ligne.annule_le && ligne.statut !== 'canceled') {\n        const fin = abonnement.cancel_at || (abonnement.cancel_at_period_end ? finDePeriode(abonnement) : null);\n        phrase = 'Résiliation programmée : ' + nom + ', fin le ' + dateLisible(fin, marche) + '.';\n      } else if (!ligne.annule_le) {\n        phrase = 'Résiliation annulée : ' + nom + ' continue (' + prix + ').';\n      }\n    }\n    if (!phrase && 'status' in avant && avant.status !== ligne.statut) {\n      if (ligne.statut === 'active') phrase = 'Abonnement actif : ' + nom + ', ' + prix + '.';\n      else if (ligne.statut === 'past_due') phrase = 'Abonnement en retard de paiement : ' + nom + '.';\n      else if (ligne.statut === 'canceled') phrase = 'Abonnement arrêté : ' + nom + '.';\n      else phrase = 'Abonnement ' + nom + ' : statut « ' + ligne.statut + ' ».';\n    }\n  }\n  if (phrase) sortie.journal.push({ marche: marche, agent: AGENT_ARGENT, texte: texte(phrase + test, 500) });\n  return sortie;\n}\n\n// ---------------------------------------------------------------------\n// charge.refunded : un paiement négatif pour la part remboursée par cet événement\n// ---------------------------------------------------------------------\nfunction chargeRemboursee(evenement, charge, contexte) {\n  const sortie = vide();\n  const client = normaliserClient(contexte.client);\n  const devise = deviseStripe(charge.currency);\n  const marche = choisirMarche(client, devise);\n  const nom = nomClient(client, charge);\n  const avant = (evenement.data && evenement.data.previous_attributes) || {};\n  // amount_refunded est cumulé : on ne garde que ce que cet événement ajoute\n  const dejaRembourse = avant.amount_refunded !== undefined ? Number(avant.amount_refunded || 0) : 0;\n  const centimes = Number(charge.amount_refunded || 0) - dejaRembourse;\n  if (centimes <= 0) return sortie;\n  if (devise !== 'EUR' && devise !== 'USD') {\n    sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,\n      texte: texte('Remboursement en ' + devise + ' ignoré (' + nom + ') : seuls EUR et USD comptent dans le cash.', 500) });\n    return sortie;\n  }\n  const montant = enUnites(centimes);\n  const total = Number(charge.amount_refunded || 0) >= Number(charge.amount || 0);\n  sortie.paiements.push(rowPaiement({\n    stripe_event_id: evenement.id,\n    stripe_invoice_id: idDe(charge.invoice),\n    stripe_customer_id: idDe(charge.customer) || (client && client.id) || null,\n    marche: marche,\n    type: 'remboursement',\n    montant: -montant,\n    devise: devise,\n    taux_eur: tauxPour(devise, contexte),\n    paye_le: dateIso(evenement.created) || dateIso(charge.created),\n    description: (total ? 'Remboursement total' : 'Remboursement partiel') + ' de ' + charge.id +\n      (charge.description ? ' · ' + charge.description : '') + suffixeTest(charge),\n  }));\n  sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,\n    texte: texte('Remboursement' + (total ? '' : ' partiel') + ' : ' + nom + ', −' + montantLisible(montant, devise) + '.' + suffixeTest(charge), 500) });\n  return sortie;\n}\n\n// ---------------------------------------------------------------------\n// charge.dispute.created : un paiement négatif (Stripe retient le montant contesté)\n// ---------------------------------------------------------------------\nfunction litigeOuvert(evenement, litige, contexte) {\n  const sortie = vide();\n  const client = normaliserClient(contexte.client);\n  const devise = deviseStripe(litige.currency);\n  const marche = choisirMarche(client, devise);\n  const nom = nomClient(client, litige);\n  const centimes = Number(litige.amount || 0);\n  if (centimes <= 0) return sortie;\n  if (devise !== 'EUR' && devise !== 'USD') {\n    sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,\n      texte: texte('Litige en ' + devise + ' ignoré (' + nom + ') : seuls EUR et USD comptent dans le cash.', 500) });\n    return sortie;\n  }\n  const montant = enUnites(centimes);\n  const echeance = litige.evidence_details && litige.evidence_details.due_by;\n  sortie.paiements.push(rowPaiement({\n    stripe_event_id: evenement.id,\n    stripe_invoice_id: null,\n    stripe_customer_id: (client && client.id) || null,\n    marche: marche,\n    type: 'litige',\n    montant: -montant,\n    devise: devise,\n    taux_eur: tauxPour(devise, contexte),\n    paye_le: dateIso(litige.created) || dateIso(evenement.created),\n    description: 'Litige ' + litige.id + ' sur ' + idDe(litige.charge) + (litige.reason ? ' · motif : ' + litige.reason : '') + suffixeTest(litige),\n  }));\n  sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,\n    texte: texte('Litige ouvert : ' + nom + ', −' + montantLisible(montant, devise) + ' retenus par Stripe' +\n      (echeance ? '. Preuves à envoyer avant le ' + dateLisible(echeance, marche) : '') + '.' + suffixeTest(litige), 500) });\n  return sortie;\n}\n\n// ---------------------------------------------------------------------\n// Point d'entrée\n// ---------------------------------------------------------------------\nfunction transformerEvenementStripe(evenement, contexte) {\n  const ctx = contexte || {};\n  if (!evenement || typeof evenement !== 'object' || !evenement.data || !evenement.data.object) return vide();\n  const objet = evenement.data.object;\n  switch (evenement.type) {\n    case 'invoice.paid': return facturePayee(evenement, objet, ctx);\n    case 'invoice.payment_failed': return factureImpayee(evenement, objet, ctx);\n    case 'customer.subscription.created':\n    case 'customer.subscription.updated':\n    case 'customer.subscription.deleted': return evenementAbonnement(evenement, objet, ctx);\n    case 'charge.refunded': return chargeRemboursee(evenement, objet, ctx);\n    case 'charge.dispute.created': return litigeOuvert(evenement, objet, ctx);\n    default: return vide();\n  }\n}\n\nif (typeof module !== 'undefined' && module.exports) {\n  module.exports = {\n    transformerEvenementStripe,\n    cibleClientStripe,\n    normaliserClient,\n    choisirMarche,\n    lireTauxBce,\n    lireTauxSecours,\n    montantLisible,\n    EVENEMENTS_GERES,\n    TYPES_PAIEMENT,\n    TAUX_USD_EUR_DERNIER_RECOURS,\n    ENGAGEMENT_MOIS_DEFAUT,\n  };\n}\n\n// ---- Lien avec le workflow n8n (ajouté par build.js) ----\nfunction sortieDe(nom) {\n  try {\n    const n = $(nom);\n    if (!n.isExecuted) return null;\n    const item = n.first();\n    return item ? item.json : null;\n  } catch (erreur) {\n    return null;\n  }\n}\n\nconst evenement = $('Stripe').first().json;\n// Taux du jour : BCE, sinon le réglage « change » de Supabase\nconst taux = lireTauxBce((sortieDe('Taux BCE') || {}).data) || lireTauxSecours(sortieDe('Taux de secours'));\nconst client = sortieDe('Lire le client Stripe');\nconst lignes = transformerEvenementStripe(evenement, { client: client, tauxUsdEur: taux ? taux.taux : null });\nreturn [{ json: Object.assign({ evenement: evenement.id, type: evenement.type, taux: taux }, lignes) }];\n"
+      },
+      "id": "c1292bd9-3721-5379-a9d3-d2c33943d4a4",
+      "name": "Transformer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "248c1595-623b-5a94-9259-a613300cf1ea",
+                    "leftValue": "={{ ($json.paiements || []).length }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Paiements"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "3d9061e5-7893-539f-a66d-f555265fe385",
+                    "leftValue": "={{ ($json.abonnements || []).length }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Abonnements"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c90abb32-99d5-51f7-af23-76eec5e3f98a",
+                    "leftValue": "={{ ($json.actions || []).length }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Actions"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "19306268-3032-5e47-b187-f7e8d47471ff",
+                    "leftValue": "={{ ($json.journal || []).length }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Journal"
+            }
+          ]
+        },
+        "options": {
+          "allMatchingOutputs": true
+        }
+      },
+      "id": "f5e46cca-31e4-5410-a787-bf6ca26a5096",
+      "name": "Écrire dans Supabase",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Réglages').first().json.supabaseUrl }}/rest/v1/paiements?on_conflict=stripe_event_id",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.paiements) }}"
+      },
+      "id": "25532866-ca92-5626-a1cd-22b4c1985e30",
+      "name": "Enregistrer les paiements",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        -240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "Supabase n8n (clé secrète)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Réglages').first().json.supabaseUrl }}/rest/v1/abonnements?on_conflict=stripe_subscription_id",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.abonnements) }}"
+      },
+      "id": "88ff82f6-4927-5280-b5be-48650edf9325",
+      "name": "Mettre à jour l'abonnement",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        -80
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "Supabase n8n (clé secrète)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Réglages').first().json.supabaseUrl }}/rest/v1/actions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.actions) }}"
+      },
+      "id": "c294a42e-4319-5980-94d7-e824c6fae21c",
+      "name": "Créer l'action à valider",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        80
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "Supabase n8n (clé secrète)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Réglages').first().json.supabaseUrl }}/rest/v1/journal",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.journal) }}"
+      },
+      "id": "8fffcea2-d2cb-59e7-afef-a8f8576f1cfd",
+      "name": "Écrire dans le journal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "Supabase n8n (clé secrète)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "connections": {
+    "Stripe": {
+      "main": [
+        [
+          {
+            "node": "Réglages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Réglages": {
+      "main": [
+        [
+          {
+            "node": "Taux BCE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Taux BCE": {
+      "main": [
+        [
+          {
+            "node": "Taux de secours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Taux de secours": {
+      "main": [
+        [
+          {
+            "node": "Préparer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer": {
+      "main": [
+        [
+          {
+            "node": "Client à lire ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Client à lire ?": {
+      "main": [
+        [
+          {
+            "node": "Lire le client Stripe",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Transformer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire le client Stripe": {
+      "main": [
+        [
+          {
+            "node": "Transformer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transformer": {
+      "main": [
+        [
+          {
+            "node": "Écrire dans Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire dans Supabase": {
+      "main": [
+        [
+          {
+            "node": "Enregistrer les paiements",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mettre à jour l'abonnement",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Créer l'action à valider",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Écrire dans le journal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Paris",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {},
+  "active": false
+}

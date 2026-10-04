@@ -1,0 +1,46 @@
+{
+  "cus_TAu7r0reInst1t": {
+    "id": "cus_TAu7r0reInst1t",
+    "object": "customer",
+    "created": 1785827400,
+    "currency": "eur",
+    "email": "contact@institut-aurore.fr",
+    "livemode": true,
+    "metadata": { "marche": "fr" },
+    "name": "Institut Aurore",
+    "preferred_locales": ["fr-FR"]
+  },
+  "cus_TMa1s0nSo1ene": {
+    "id": "cus_TMa1s0nSo1ene",
+    "object": "customer",
+    "created": 1783149000,
+    "currency": "eur",
+    "email": "bonjour@maison-solene.fr",
+    "livemode": true,
+    "metadata": { "marche": "FR " },
+    "name": "Maison Solène",
+    "preferred_locales": ["fr-FR"]
+  },
+  "cus_TG1owAesthet1c": {
+    "id": "cus_TG1owAesthet1c",
+    "object": "customer",
+    "created": 1788522200,
+    "currency": "usd",
+    "email": "owner@glowaesthetics.com",
+    "livemode": true,
+    "metadata": { "marche": "us" },
+    "name": "Glow Aesthetics",
+    "preferred_locales": ["en-US"]
+  },
+  "cus_TAte1ierB0isPl": {
+    "id": "cus_TAte1ierB0isPl",
+    "object": "customer",
+    "created": 1788513500,
+    "currency": "eur",
+    "email": "atelier@boisetplan.fr",
+    "livemode": true,
+    "metadata": { "marche": "fr" },
+    "name": "Atelier Bois & Plan",
+    "preferred_locales": ["fr-FR"]
+  }
+}

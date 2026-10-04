@@ -1,0 +1,63 @@
+{
+  "id": "evt_1SKyA1J8kR4mTzWQG1owEnd0",
+  "object": "event",
+  "api_version": "2026-08-26.dahlia",
+  "created": 1791119401,
+  "livemode": true,
+  "pending_webhooks": 1,
+  "request": { "id": null, "idempotency_key": null },
+  "type": "customer.subscription.deleted",
+  "data": {
+    "object": {
+      "id": "sub_1S8tQ2J8kR4mTzWQG1owSt01",
+      "object": "subscription",
+      "billing_cycle_anchor": 1788522300,
+      "cancel_at": null,
+      "cancel_at_period_end": false,
+      "canceled_at": 1791119400,
+      "cancellation_details": { "comment": null, "feedback": "too_expensive", "reason": "cancellation_requested" },
+      "collection_method": "charge_automatically",
+      "created": 1788522300,
+      "currency": "usd",
+      "customer": "cus_TG1owAesthet1c",
+      "discounts": [],
+      "ended_at": 1791119400,
+      "items": {
+        "object": "list",
+        "data": [
+          {
+            "id": "si_TG1owStarter01",
+            "object": "subscription_item",
+            "created": 1788522301,
+            "current_period_end": 1793796300,
+            "current_period_start": 1791117900,
+            "metadata": {},
+            "price": {
+              "id": "price_1S0kUsJ8kR4mTzWQStart497",
+              "object": "price",
+              "active": true,
+              "currency": "usd",
+              "metadata": {},
+              "product": "prod_T0kStarterUs",
+              "recurring": { "interval": "month", "interval_count": 1, "meter": null, "usage_type": "licensed" },
+              "type": "recurring",
+              "unit_amount": 49700,
+              "unit_amount_decimal": "49700"
+            },
+            "quantity": 1,
+            "subscription": "sub_1S8tQ2J8kR4mTzWQG1owSt01"
+          }
+        ],
+        "has_more": false,
+        "url": "/v1/subscription_items?subscription=sub_1S8tQ2J8kR4mTzWQG1owSt01"
+      },
+      "latest_invoice": "in_1SKx9nJ8kR4mTzWQG1owAe04",
+      "livemode": true,
+      "metadata": { "engagement_mois": "3" },
+      "start_date": 1788522300,
+      "status": "canceled",
+      "trial_end": null,
+      "trial_start": null
+    }
+  }
+}

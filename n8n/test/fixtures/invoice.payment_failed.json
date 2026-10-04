@@ -1,0 +1,95 @@
+{
+  "id": "evt_1SKwFfJ8kR4mTzWQBo1sImpa",
+  "object": "event",
+  "api_version": "2026-08-26.dahlia",
+  "created": 1791109205,
+  "livemode": true,
+  "pending_webhooks": 1,
+  "request": { "id": null, "idempotency_key": null },
+  "type": "invoice.payment_failed",
+  "data": {
+    "object": {
+      "id": "in_1SKwFcJ8kR4mTzWQB0isPlan",
+      "object": "invoice",
+      "account_country": "FR",
+      "account_name": "J-Square",
+      "amount_due": 69000,
+      "amount_overpaid": 0,
+      "amount_paid": 0,
+      "amount_remaining": 69000,
+      "attempt_count": 1,
+      "attempted": true,
+      "billing_reason": "subscription_cycle",
+      "collection_method": "charge_automatically",
+      "created": 1791105600,
+      "currency": "eur",
+      "customer": "cus_TAte1ierB0isPl",
+      "customer_email": "atelier@boisetplan.fr",
+      "customer_name": "Atelier Bois & Plan",
+      "discounts": [],
+      "hosted_invoice_url": "https://invoice.stripe.com/i/acct_1S0jsq/live_Ym9pc2V0cGxhbg",
+      "last_finalization_error": null,
+      "lines": {
+        "object": "list",
+        "data": [
+          {
+            "id": "il_1SKwFcJ8kR4mTzWQCro690m1",
+            "object": "line_item",
+            "amount": 69000,
+            "currency": "eur",
+            "description": "1 × Croissance (at €690.00 / month)",
+            "discount_amounts": [],
+            "discountable": true,
+            "discounts": [],
+            "invoice": "in_1SKwFcJ8kR4mTzWQB0isPlan",
+            "livemode": true,
+            "metadata": {},
+            "parent": {
+              "type": "subscription_item_details",
+              "invoice_item_details": null,
+              "subscription_item_details": {
+                "invoice_item": null,
+                "proration": false,
+                "proration_details": { "credited_items": null },
+                "subscription": "sub_1S5aB0J8kR4mTzWQB0isPl01",
+                "subscription_item": "si_TAte1ierCro01"
+              }
+            },
+            "period": { "end": 1793787600, "start": 1791109200 },
+            "pretax_credit_amounts": [],
+            "pricing": {
+              "price_details": { "price": "price_1S0k3aJ8kR4mTzWQCro690m", "product": "prod_T0kCroissanceM" },
+              "type": "price_details",
+              "unit_amount_decimal": "69000"
+            },
+            "quantity": 1,
+            "quantity_decimal": "1",
+            "subtotal": 69000,
+            "taxes": []
+          }
+        ],
+        "has_more": false,
+        "url": "/v1/invoices/in_1SKwFcJ8kR4mTzWQB0isPlan/lines"
+      },
+      "livemode": true,
+      "metadata": {},
+      "next_payment_attempt": 1791368005,
+      "number": "JSQ-2026-0024",
+      "parent": {
+        "quote_details": null,
+        "subscription_details": { "metadata": {}, "subscription": "sub_1S5aB0J8kR4mTzWQB0isPl01" },
+        "type": "subscription_details"
+      },
+      "period_end": 1791105600,
+      "period_start": 1788513600,
+      "starting_balance": 0,
+      "status": "open",
+      "status_transitions": { "finalized_at": 1791109200, "marked_uncollectible_at": null, "paid_at": null, "voided_at": null },
+      "subtotal": 69000,
+      "total": 69000,
+      "total_discount_amounts": [],
+      "total_pretax_credit_amounts": [],
+      "total_taxes": []
+    }
+  }
+}

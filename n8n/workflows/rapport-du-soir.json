@@ -1,0 +1,561 @@
+{
+  "name": "rapport-du-soir",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Rapport du soir (23:00, heure de Paris)\nHermès lit Supabase en lecture seule et écrit la synthèse du jour.\n1. Mets l'URL Supabase, l'adresse d'Hermès et le modèle dans **Réglages**.\n2. Choisis les identifiants « Supabase n8n (clé secrète) » et « Hermès API ».\n3. Active le workflow.\nLe code des nœuds Code vient de `n8n/rapport-du-soir.js` (ne pas le modifier ici).",
+        "height": 220,
+        "width": 520,
+        "color": 5
+      },
+      "id": "e14c9daf-6aaa-5ea7-8159-2f85bf752a8a",
+      "name": "À lire",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 23,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "8580510e-c5f1-56dd-b6ec-1b3b337475e6",
+      "name": "Chaque soir à 23 h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d0c1b5c2-c8a6-5dfb-b82f-e3e1494e9dcc",
+              "name": "supabaseUrl",
+              "value": "https://VOTRE-PROJET.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "6a18abc7-a321-56e6-8bed-2c46d85694b0",
+              "name": "hermesUrl",
+              "value": "http://host.docker.internal:8642",
+              "type": "string"
+            },
+            {
+              "id": "4df9ca24-33ba-57c5-b649-f5b82cea52ee",
+              "name": "hermesModel",
+              "value": "hermes-agent",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "262ba433-7129-547f-a778-93cd7d827dc1",
+      "name": "Réglages",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "'use strict';\n// =====================================================================\n// rapport-du-soir.js : la demande envoyée à Hermès à 23:00 et la lecture\n// de sa réponse en lignes Supabase (rapports, messages, agents_etat, journal).\n// Contrat : cockpit/CONTRAT-TECHNIQUE.md, section 4 (rapport-du-soir).\n//\n// Fonctions pures (l'heure est toujours passée en paramètre). Ce fichier est\n// collé tel quel dans les nœuds Code du workflow par build.js.\n// =====================================================================\n\nconst VERDICTS = ['tenir', 'ajuster_prix', 'changer_niche', 'changer_offre', 'alerte'];\nconst VERDICT_PAR_DEFAUT = 'tenir';\nconst AGENT_REPORTER = 'reporter';\nconst NOM_REPORTER = 'Rapport du soir';\nconst LIMITE_MESSAGE = 8000; // messages.contenu : 8000 caractères au plus\n\nfunction enTexte(valeur) {\n  return String(valeur === null || valeur === undefined ? '' : valeur);\n}\n\nfunction couper(t, max) {\n  const s = enTexte(t).trim();\n  return s.length > max ? s.slice(0, max - 1) + '…' : s;\n}\n\n// Date du jour à Paris, au format AAAA-MM-JJ\nfunction jourParis(maintenant) {\n  const p = {};\n  for (const x of new Intl.DateTimeFormat('en-US', {\n    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',\n  }).formatToParts(new Date(maintenant))) p[x.type] = x.value;\n  return p.year + '-' + p.month + '-' + p.day;\n}\n\n// « 2026-10-04 » -> « 4 octobre »\nfunction jourLisible(jour) {\n  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', timeZone: 'UTC' })\n    .format(new Date(jour + 'T12:00:00Z'));\n}\n\n// Écart (minutes) entre l'heure de Paris et l'heure UTC à un instant donné\nfunction decalageParis(instant) {\n  const p = {};\n  for (const x of new Intl.DateTimeFormat('en-US', {\n    timeZone: 'Europe/Paris', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit',\n    hour: '2-digit', minute: '2-digit', second: '2-digit',\n  }).formatToParts(new Date(instant))) p[x.type] = x.value;\n  const commeUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);\n  return Math.round((commeUtc - instant) / 60000);\n}\n\n// Instant UTC qui correspond à « jour à hh:mm, heure de Paris »\nfunction heureParis(jour, heure, minute) {\n  const [a, m, j] = jour.split('-').map(Number);\n  const local = Date.UTC(a, m - 1, j, heure, minute);\n  let instant = local - decalageParis(local) * 60000;\n  instant = local - decalageParis(instant) * 60000;\n  return new Date(instant);\n}\n\n// Prochain passage du rapport (23:00 à Paris) après « maintenant »\nfunction prochainRapport(maintenant) {\n  const t = new Date(maintenant).getTime();\n  const aujourdhui = heureParis(jourParis(t), 23, 0);\n  if (aujourdhui.getTime() > t + 60000) return aujourdhui.toISOString();\n  const demain = jourParis(t + 24 * 3600 * 1000);\n  return heureParis(demain, 23, 0).toISOString();\n}\n\n// ---------------------------------------------------------------------\n// Demande envoyée à Hermès (API compatible OpenAI : /v1/chat/completions)\n// ---------------------------------------------------------------------\nfunction construireDemandeHermes(options) {\n  const jour = options.jour;\n  const modele = options.modele || 'hermes-agent';\n  const systeme = [\n    'Tu es Hermès, le centre de contrôle de J-Square : Jay vend en France, Junior aux États-Unis.',\n    'Ce soir tu joues l\\'agent reporter.',\n    'Tu lis la base Supabase du cockpit en lecture seule avec ton outil MCP Supabase.',\n    'Tu n\\'écris rien dans la base et tu ne déclenches aucune action réelle :',\n    'toute action passe par la table actions et la validation de Jay.',\n  ].join(' ');\n  const consigne = [\n    'Écris le rapport du soir du ' + jourLisible(jour) + ' (' + jour + ', heure de Paris).',\n    '',\n    'Lis au minimum : v_cash_resume, v_cash_attendu, v_seuils, v_partage, les paiements et le journal du jour,',\n    'abonnements, clients, appels (comptes par écran et par statut), actions en attente, objectifs du mois.',\n    'Croise avec des sources externes si tu en as. Puis juge s\\'il faut changer de trajectoire ou de prix.',\n    '',\n    'Réponds uniquement avec un objet JSON, sans texte autour, de cette forme :',\n    '{\"verdict\": \"tenir | ajuster_prix | changer_niche | changer_offre | alerte\",',\n    ' \"resume\": \"une phrase de 200 caractères au plus\",',\n    ' \"contenu\": \"le rapport complet, 15 lignes au plus, une idée par ligne\",',\n    ' \"donnees\": {\"les chiffres clés\": 0}}',\n    '',\n    'Écris pour Jay, qui n\\'est pas développeur : français simple, pas de jargon,',\n    'euros pour la France, dollars pour les USA. « alerte » seulement si un problème demande une décision ce soir.',\n  ].join('\\n');\n  return {\n    model: modele,\n    stream: false,\n    messages: [\n      { role: 'system', content: systeme },\n      { role: 'user', content: consigne },\n    ],\n  };\n}\n\n// ---------------------------------------------------------------------\n// Lecture de la réponse d'Hermès\n// ---------------------------------------------------------------------\nfunction texteDeReponse(reponse) {\n  if (!reponse || typeof reponse !== 'object' || reponse.error) return null;\n  const choix = Array.isArray(reponse.choices) ? reponse.choices[0] : null;\n  const contenu = choix && choix.message ? choix.message.content : null;\n  if (typeof contenu === 'string') return contenu.trim() || null;\n  if (Array.isArray(contenu)) {\n    const t = contenu.map(function (p) { return p && typeof p.text === 'string' ? p.text : ''; }).join('').trim();\n    return t || null;\n  }\n  return null;\n}\n\n// Cherche un objet JSON : réponse entière, bloc ```json, ou du premier { au dernier }\nfunction extraireJson(t) {\n  const essais = [t];\n  const bloc = t.match(/```(?:json)?\\s*([\\s\\S]*?)```/i);\n  if (bloc) essais.push(bloc[1].trim());\n  const debut = t.indexOf('{');\n  const fin = t.lastIndexOf('}');\n  if (debut >= 0 && fin > debut) essais.push(t.slice(debut, fin + 1));\n  for (const e of essais) {\n    try {\n      const o = JSON.parse(e);\n      if (o && typeof o === 'object' && !Array.isArray(o)) return o;\n    } catch (erreur) { /* essai suivant */ }\n  }\n  return null;\n}\n\nfunction normaliserVerdict(brut) {\n  const v = enTexte(brut).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()\n    .replace(/[^a-z]+/g, '_').replace(/^_+|_+$/g, '');\n  if (!v) return null;\n  if (VERDICTS.indexOf(v) >= 0) return v;\n  if (/^tenir/.test(v) || v === 'garder_le_cap') return 'tenir';\n  if (/ajuster.*prix|changer.*prix|baisser.*prix|monter.*prix/.test(v)) return 'ajuster_prix';\n  if (/niche/.test(v)) return 'changer_niche';\n  if (/offre/.test(v)) return 'changer_offre';\n  if (/alerte|urgence/.test(v)) return 'alerte';\n  return null;\n}\n\n// En texte libre : verdict lu après « Verdict : », sinon « tenir »\nfunction verdictDansTexte(t) {\n  const m = t.match(/verdict\\s*[:：-]\\s*([^\\n.;,]+)/i);\n  return (m && normaliserVerdict(m[1])) || VERDICT_PAR_DEFAUT;\n}\n\n// Première vraie ligne d'un texte, sans la mise en forme Markdown\nfunction premiereLigne(t) {\n  const lignes = t.split('\\n').map(function (l) { return l.replace(/^[\\s#>*\\-•]+/, '').replace(/\\*\\*/g, '').trim(); });\n  return lignes.find(function (l) { return l.length > 0 && !/^rapport du/i.test(l); }) || lignes.find(Boolean) || '';\n}\n\nfunction lireReponseHermes(reponse, options) {\n  const jour = options.jour;\n  const maintenant = new Date(options.maintenant).toISOString();\n  const lisible = jourLisible(jour);\n  const brut = texteDeReponse(reponse);\n\n  if (!brut) {\n    const detail = reponse && reponse.error\n      ? couper(reponse.error.message || reponse.error.description || JSON.stringify(reponse.error), 300)\n      : 'réponse vide';\n    return {\n      ok: false,\n      rapports: [],\n      messages: [{\n        auteur: 'systeme', marche: null, type: 'alerte',\n        contenu: couper('Le rapport du soir du ' + lisible + ' n\\'a pas pu être écrit : Hermès ne répond pas (' + detail + '). ' +\n          'n8n réessaiera demain à 23:00. Tu peux aussi relancer le workflow « rapport-du-soir » à la main dans n8n.', LIMITE_MESSAGE),\n        meta: { rapport: jour, erreur: detail },\n      }],\n      agents_etat: [{\n        agent: AGENT_REPORTER, nom: NOM_REPORTER, statut: 'err',\n        derniere_phrase: 'Hermès n\\'a pas répondu ce soir.',\n        derniere_execution: maintenant, prochaine_execution: prochainRapport(maintenant),\n      }],\n      journal: [{ marche: null, agent: AGENT_REPORTER, texte: 'Rapport du ' + lisible + ' non écrit : Hermès ne répond pas.' }],\n    };\n  }\n\n  const objet = extraireJson(brut);\n  let verdict;\n  let resume;\n  let contenu;\n  let donnees = {};\n  let format;\n  if (objet && (objet.contenu || objet.resume)) {\n    format = 'json';\n    contenu = enTexte(objet.contenu || objet.resume).trim();\n    resume = enTexte(objet.resume).trim() || premiereLigne(contenu);\n    verdict = normaliserVerdict(objet.verdict) || verdictDansTexte(contenu);\n    if (objet.donnees && typeof objet.donnees === 'object' && !Array.isArray(objet.donnees)) donnees = objet.donnees;\n    if (objet.verdict && !normaliserVerdict(objet.verdict)) donnees = Object.assign({}, donnees, { verdict_hermes: enTexte(objet.verdict) });\n  } else {\n    // Hermès a répondu en texte libre : on garde tout le texte\n    format = 'texte_libre';\n    contenu = brut;\n    resume = premiereLigne(brut);\n    verdict = verdictDansTexte(brut);\n  }\n  resume = couper(resume, 280);\n  donnees = Object.assign({}, donnees, {\n    format: format,\n    modele: reponse.model || null,\n    jetons: reponse.usage && reponse.usage.total_tokens ? reponse.usage.total_tokens : null,\n  });\n\n  const entete = 'Rapport du ' + lisible + ' · verdict : ' + verdict.replace(/_/g, ' ');\n  const corps = contenu.indexOf(resume.replace(/…$/, '')) >= 0 ? contenu : resume + '\\n\\n' + contenu;\n  return {\n    ok: true,\n    rapports: [{ jour: jour, verdict: verdict, resume: resume, contenu: contenu, donnees: donnees }],\n    messages: [{\n      auteur: 'hermes', marche: null, type: 'rapport',\n      contenu: couper(entete + '\\n' + corps, LIMITE_MESSAGE),\n      meta: { rapport: jour, verdict: verdict },\n    }],\n    agents_etat: [{\n      agent: AGENT_REPORTER, nom: NOM_REPORTER, statut: 'ok',\n      derniere_phrase: couper('Rapport du ' + lisible + ' : ' + resume, 200),\n      derniere_execution: maintenant, prochaine_execution: prochainRapport(maintenant),\n    }],\n    journal: [{ marche: null, agent: AGENT_REPORTER, texte: couper('Rapport du ' + lisible + ' écrit. Verdict : ' + verdict.replace(/_/g, ' ') + '.', 500) }],\n  };\n}\n\n// État « en cours » posé au début du workflow\nfunction reporterEnCours(maintenant) {\n  return {\n    agent: AGENT_REPORTER, nom: NOM_REPORTER, statut: 'run',\n    derniere_phrase: 'J\\'écris le rapport du soir.',\n    derniere_execution: new Date(maintenant).toISOString(),\n    prochaine_execution: prochainRapport(maintenant),\n  };\n}\n\nif (typeof module !== 'undefined' && module.exports) {\n  module.exports = {\n    construireDemandeHermes,\n    lireReponseHermes,\n    reporterEnCours,\n    extraireJson,\n    normaliserVerdict,\n    jourParis,\n    jourLisible,\n    heureParis,\n    prochainRapport,\n    VERDICTS,\n  };\n}\n\n// ---- Lien avec le workflow n8n (ajouté par build.js) ----\nfunction sortieDe(nom) {\n  try {\n    const n = $(nom);\n    if (!n.isExecuted) return null;\n    const item = n.first();\n    return item ? item.json : null;\n  } catch (erreur) {\n    return null;\n  }\n}\n\nconst reglages = $('Réglages').first().json;\nconst maintenant = new Date().toISOString();\nconst jour = jourParis(maintenant);\nreturn [{ json: {\n  jour: jour,\n  demande: construireDemandeHermes({ jour: jour, modele: reglages.hermesModel }),\n  reporter: reporterEnCours(maintenant),\n} }];\n"
+      },
+      "id": "ae0d4171-9759-514f-b8ad-4d7aca9ad117",
+      "name": "Préparer la demande",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Réglages').first().json.supabaseUrl }}/rest/v1/agents_etat?on_conflict=agent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify([$json.reporter]) }}"
+      },
+      "id": "044c8e6b-606c-5d2f-a656-4f884ca40ec8",
+      "name": "Reporter : en cours",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "Supabase n8n (clé secrète)"
+        }
+      },
+      "retryOnFail": false,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Réglages').first().json.hermesUrl }}/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Préparer la demande').first().json.demande) }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "f8865909-d7ee-5609-8a1b-ddb18997f9c0",
+      "name": "Demander à Hermès",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": null,
+          "name": "Hermès API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "'use strict';\n// =====================================================================\n// rapport-du-soir.js : la demande envoyée à Hermès à 23:00 et la lecture\n// de sa réponse en lignes Supabase (rapports, messages, agents_etat, journal).\n// Contrat : cockpit/CONTRAT-TECHNIQUE.md, section 4 (rapport-du-soir).\n//\n// Fonctions pures (l'heure est toujours passée en paramètre). Ce fichier est\n// collé tel quel dans les nœuds Code du workflow par build.js.\n// =====================================================================\n\nconst VERDICTS = ['tenir', 'ajuster_prix', 'changer_niche', 'changer_offre', 'alerte'];\nconst VERDICT_PAR_DEFAUT = 'tenir';\nconst AGENT_REPORTER = 'reporter';\nconst NOM_REPORTER = 'Rapport du soir';\nconst LIMITE_MESSAGE = 8000; // messages.contenu : 8000 caractères au plus\n\nfunction enTexte(valeur) {\n  return String(valeur === null || valeur === undefined ? '' : valeur);\n}\n\nfunction couper(t, max) {\n  const s = enTexte(t).trim();\n  return s.length > max ? s.slice(0, max - 1) + '…' : s;\n}\n\n// Date du jour à Paris, au format AAAA-MM-JJ\nfunction jourParis(maintenant) {\n  const p = {};\n  for (const x of new Intl.DateTimeFormat('en-US', {\n    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',\n  }).formatToParts(new Date(maintenant))) p[x.type] = x.value;\n  return p.year + '-' + p.month + '-' + p.day;\n}\n\n// « 2026-10-04 » -> « 4 octobre »\nfunction jourLisible(jour) {\n  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', timeZone: 'UTC' })\n    .format(new Date(jour + 'T12:00:00Z'));\n}\n\n// Écart (minutes) entre l'heure de Paris et l'heure UTC à un instant donné\nfunction decalageParis(instant) {\n  const p = {};\n  for (const x of new Intl.DateTimeFormat('en-US', {\n    timeZone: 'Europe/Paris', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit',\n    hour: '2-digit', minute: '2-digit', second: '2-digit',\n  }).formatToParts(new Date(instant))) p[x.type] = x.value;\n  const commeUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);\n  return Math.round((commeUtc - instant) / 60000);\n}\n\n// Instant UTC qui correspond à « jour à hh:mm, heure de Paris »\nfunction heureParis(jour, heure, minute) {\n  const [a, m, j] = jour.split('-').map(Number);\n  const local = Date.UTC(a, m - 1, j, heure, minute);\n  let instant = local - decalageParis(local) * 60000;\n  instant = local - decalageParis(instant) * 60000;\n  return new Date(instant);\n}\n\n// Prochain passage du rapport (23:00 à Paris) après « maintenant »\nfunction prochainRapport(maintenant) {\n  const t = new Date(maintenant).getTime();\n  const aujourdhui = heureParis(jourParis(t), 23, 0);\n  if (aujourdhui.getTime() > t + 60000) return aujourdhui.toISOString();\n  const demain = jourParis(t + 24 * 3600 * 1000);\n  return heureParis(demain, 23, 0).toISOString();\n}\n\n// ---------------------------------------------------------------------\n// Demande envoyée à Hermès (API compatible OpenAI : /v1/chat/completions)\n// ---------------------------------------------------------------------\nfunction construireDemandeHermes(options) {\n  const jour = options.jour;\n  const modele = options.modele || 'hermes-agent';\n  const systeme = [\n    'Tu es Hermès, le centre de contrôle de J-Square : Jay vend en France, Junior aux États-Unis.',\n    'Ce soir tu joues l\\'agent reporter.',\n    'Tu lis la base Supabase du cockpit en lecture seule avec ton outil MCP Supabase.',\n    'Tu n\\'écris rien dans la base et tu ne déclenches aucune action réelle :',\n    'toute action passe par la table actions et la validation de Jay.',\n  ].join(' ');\n  const consigne = [\n    'Écris le rapport du soir du ' + jourLisible(jour) + ' (' + jour + ', heure de Paris).',\n    '',\n    'Lis au minimum : v_cash_resume, v_cash_attendu, v_seuils, v_partage, les paiements et le journal du jour,',\n    'abonnements, clients, appels (comptes par écran et par statut), actions en attente, objectifs du mois.',\n    'Croise avec des sources externes si tu en as. Puis juge s\\'il faut changer de trajectoire ou de prix.',\n    '',\n    'Réponds uniquement avec un objet JSON, sans texte autour, de cette forme :',\n    '{\"verdict\": \"tenir | ajuster_prix | changer_niche | changer_offre | alerte\",',\n    ' \"resume\": \"une phrase de 200 caractères au plus\",',\n    ' \"contenu\": \"le rapport complet, 15 lignes au plus, une idée par ligne\",',\n    ' \"donnees\": {\"les chiffres clés\": 0}}',\n    '',\n    'Écris pour Jay, qui n\\'est pas développeur : français simple, pas de jargon,',\n    'euros pour la France, dollars pour les USA. « alerte » seulement si un problème demande une décision ce soir.',\n  ].join('\\n');\n  return {\n    model: modele,\n    stream: false,\n    messages: [\n      { role: 'system', content: systeme },\n      { role: 'user', content: consigne },\n    ],\n  };\n}\n\n// ---------------------------------------------------------------------\n// Lecture de la réponse d'Hermès\n// ---------------------------------------------------------------------\nfunction texteDeReponse(reponse) {\n  if (!reponse || typeof reponse !== 'object' || reponse.error) return null;\n  const choix = Array.isArray(reponse.choices) ? reponse.choices[0] : null;\n  const contenu = choix && choix.message ? choix.message.content : null;\n  if (typeof contenu === 'string') return contenu.trim() || null;\n  if (Array.isArray(contenu)) {\n    const t = contenu.map(function (p) { return p && typeof p.text === 'string' ? p.text : ''; }).join('').trim();\n    return t || null;\n  }\n  return null;\n}\n\n// Cherche un objet JSON : réponse entière, bloc ```json, ou du premier { au dernier }\nfunction extraireJson(t) {\n  const essais = [t];\n  const bloc = t.match(/```(?:json)?\\s*([\\s\\S]*?)```/i);\n  if (bloc) essais.push(bloc[1].trim());\n  const debut = t.indexOf('{');\n  const fin = t.lastIndexOf('}');\n  if (debut >= 0 && fin > debut) essais.push(t.slice(debut, fin + 1));\n  for (const e of essais) {\n    try {\n      const o = JSON.parse(e);\n      if (o && typeof o === 'object' && !Array.isArray(o)) return o;\n    } catch (erreur) { /* essai suivant */ }\n  }\n  return null;\n}\n\nfunction normaliserVerdict(brut) {\n  const v = enTexte(brut).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()\n    .replace(/[^a-z]+/g, '_').replace(/^_+|_+$/g, '');\n  if (!v) return null;\n  if (VERDICTS.indexOf(v) >= 0) return v;\n  if (/^tenir/.test(v) || v === 'garder_le_cap') return 'tenir';\n  if (/ajuster.*prix|changer.*prix|baisser.*prix|monter.*prix/.test(v)) return 'ajuster_prix';\n  if (/niche/.test(v)) return 'changer_niche';\n  if (/offre/.test(v)) return 'changer_offre';\n  if (/alerte|urgence/.test(v)) return 'alerte';\n  return null;\n}\n\n// En texte libre : verdict lu après « Verdict : », sinon « tenir »\nfunction verdictDansTexte(t) {\n  const m = t.match(/verdict\\s*[:：-]\\s*([^\\n.;,]+)/i);\n  return (m && normaliserVerdict(m[1])) || VERDICT_PAR_DEFAUT;\n}\n\n// Première vraie ligne d'un texte, sans la mise en forme Markdown\nfunction premiereLigne(t) {\n  const lignes = t.split('\\n').map(function (l) { return l.replace(/^[\\s#>*\\-•]+/, '').replace(/\\*\\*/g, '').trim(); });\n  return lignes.find(function (l) { return l.length > 0 && !/^rapport du/i.test(l); }) || lignes.find(Boolean) || '';\n}\n\nfunction lireReponseHermes(reponse, options) {\n  const jour = options.jour;\n  const maintenant = new Date(options.maintenant).toISOString();\n  const lisible = jourLisible(jour);\n  const brut = texteDeReponse(reponse);\n\n  if (!brut) {\n    const detail = reponse && reponse.error\n      ? couper(reponse.error.message || reponse.error.description || JSON.stringify(reponse.error), 300)\n      : 'réponse vide';\n    return {\n      ok: false,\n      rapports: [],\n      messages: [{\n        auteur: 'systeme', marche: null, type: 'alerte',\n        contenu: couper('Le rapport du soir du ' + lisible + ' n\\'a pas pu être écrit : Hermès ne répond pas (' + detail + '). ' +\n          'n8n réessaiera demain à 23:00. Tu peux aussi relancer le workflow « rapport-du-soir » à la main dans n8n.', LIMITE_MESSAGE),\n        meta: { rapport: jour, erreur: detail },\n      }],\n      agents_etat: [{\n        agent: AGENT_REPORTER, nom: NOM_REPORTER, statut: 'err',\n        derniere_phrase: 'Hermès n\\'a pas répondu ce soir.',\n        derniere_execution: maintenant, prochaine_execution: prochainRapport(maintenant),\n      }],\n      journal: [{ marche: null, agent: AGENT_REPORTER, texte: 'Rapport du ' + lisible + ' non écrit : Hermès ne répond pas.' }],\n    };\n  }\n\n  const objet = extraireJson(brut);\n  let verdict;\n  let resume;\n  let contenu;\n  let donnees = {};\n  let format;\n  if (objet && (objet.contenu || objet.resume)) {\n    format = 'json';\n    contenu = enTexte(objet.contenu || objet.resume).trim();\n    resume = enTexte(objet.resume).trim() || premiereLigne(contenu);\n    verdict = normaliserVerdict(objet.verdict) || verdictDansTexte(contenu);\n    if (objet.donnees && typeof objet.donnees === 'object' && !Array.isArray(objet.donnees)) donnees = objet.donnees;\n    if (objet.verdict && !normaliserVerdict(objet.verdict)) donnees = Object.assign({}, donnees, { verdict_hermes: enTexte(objet.verdict) });\n  } else {\n    // Hermès a répondu en texte libre : on garde tout le texte\n    format = 'texte_libre';\n    contenu = brut;\n    resume = premiereLigne(brut);\n    verdict = verdictDansTexte(brut);\n  }\n  resume = couper(resume, 280);\n  donnees = Object.assign({}, donnees, {\n    format: format,\n    modele: reponse.model || null,\n    jetons: reponse.usage && reponse.usage.total_tokens ? reponse.usage.total_tokens : null,\n  });\n\n  const entete = 'Rapport du ' + lisible + ' · verdict : ' + verdict.replace(/_/g, ' ');\n  const corps = contenu.indexOf(resume.replace(/…$/, '')) >= 0 ? contenu : resume + '\\n\\n' + contenu;\n  return {\n    ok: true,\n    rapports: [{ jour: jour, verdict: verdict, resume: resume, contenu: contenu, donnees: donnees }],\n    messages: [{\n      auteur: 'hermes', marche: null, type: 'rapport',\n      contenu: couper(entete + '\\n' + corps, LIMITE_MESSAGE),\n      meta: { rapport: jour, verdict: verdict },\n    }],\n    agents_etat: [{\n      agent: AGENT_REPORTER, nom: NOM_REPORTER, statut: 'ok',\n      derniere_phrase: couper('Rapport du ' + lisible + ' : ' + resume, 200),\n      derniere_execution: maintenant, prochaine_execution: prochainRapport(maintenant),\n    }],\n    journal: [{ marche: null, agent: AGENT_REPORTER, texte: couper('Rapport du ' + lisible + ' écrit. Verdict : ' + verdict.replace(/_/g, ' ') + '.', 500) }],\n  };\n}\n\n// État « en cours » posé au début du workflow\nfunction reporterEnCours(maintenant) {\n  return {\n    agent: AGENT_REPORTER, nom: NOM_REPORTER, statut: 'run',\n    derniere_phrase: 'J\\'écris le rapport du soir.',\n    derniere_execution: new Date(maintenant).toISOString(),\n    prochaine_execution: prochainRapport(maintenant),\n  };\n}\n\nif (typeof module !== 'undefined' && module.exports) {\n  module.exports = {\n    construireDemandeHermes,\n    lireReponseHermes,\n    reporterEnCours,\n    extraireJson,\n    normaliserVerdict,\n    jourParis,\n    jourLisible,\n    heureParis,\n    prochainRapport,\n    VERDICTS,\n  };\n}\n\n// ---- Lien avec le workflow n8n (ajouté par build.js) ----\nfunction sortieDe(nom) {\n  try {\n    const n = $(nom);\n    if (!n.isExecuted) return null;\n    const item = n.first();\n    return item ? item.json : null;\n  } catch (erreur) {\n    return null;\n  }\n}\n\nconst preparation = $('Préparer la demande').first().json;\nconst reponse = sortieDe('Demander à Hermès') || {};\nconst lignes = lireReponseHermes(reponse, { jour: preparation.jour, maintenant: new Date().toISOString() });\nreturn [{ json: lignes }];\n"
+      },
+      "id": "ca662755-21e7-5b6e-933f-69ee27c2b8a5",
+      "name": "Lire la réponse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9ba6c871-5f4b-5aec-8f30-746b5c8305f6",
+                    "leftValue": "={{ ($json.rapports || []).length }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Rapport"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c2b94510-efa9-5c03-949f-b8d859301de2",
+                    "leftValue": "={{ ($json.messages || []).length }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Message"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "bb79dbc6-3c65-51af-a435-6d074e6060e2",
+                    "leftValue": "={{ ($json.agents_etat || []).length }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "État de l'agent"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "ea4d959b-c2bd-5f2f-8f5c-b0f7c7507e64",
+                    "leftValue": "={{ ($json.journal || []).length }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Journal"
+            }
+          ]
+        },
+        "options": {
+          "allMatchingOutputs": true
+        }
+      },
+      "id": "0c50e3d7-c034-5a1d-a909-fac65d052707",
+      "name": "Écrire dans Supabase",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Réglages').first().json.supabaseUrl }}/rest/v1/rapports?on_conflict=jour",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.rapports) }}"
+      },
+      "id": "8220e711-1aa9-5beb-b96f-dc2c345eff55",
+      "name": "Enregistrer le rapport",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        -240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "Supabase n8n (clé secrète)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Réglages').first().json.supabaseUrl }}/rest/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.messages) }}"
+      },
+      "id": "ada95b79-24c6-5975-a854-d197eb072493",
+      "name": "Poster dans la messagerie",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        -80
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "Supabase n8n (clé secrète)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Réglages').first().json.supabaseUrl }}/rest/v1/agents_etat?on_conflict=agent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.agents_etat) }}"
+      },
+      "id": "42d55203-67cd-5097-8876-71eade7c5f49",
+      "name": "Mettre à jour l'agent reporter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        80
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "Supabase n8n (clé secrète)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Réglages').first().json.supabaseUrl }}/rest/v1/journal",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.journal) }}"
+      },
+      "id": "a534f2b3-7941-5985-b5e3-16dd08f90f4b",
+      "name": "Écrire dans le journal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "Supabase n8n (clé secrète)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "connections": {
+    "Chaque soir à 23 h": {
+      "main": [
+        [
+          {
+            "node": "Réglages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Réglages": {
+      "main": [
+        [
+          {
+            "node": "Préparer la demande",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer la demande": {
+      "main": [
+        [
+          {
+            "node": "Reporter : en cours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reporter : en cours": {
+      "main": [
+        [
+          {
+            "node": "Demander à Hermès",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Demander à Hermès": {
+      "main": [
+        [
+          {
+            "node": "Lire la réponse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire la réponse": {
+      "main": [
+        [
+          {
+            "node": "Écrire dans Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Écrire dans Supabase": {
+      "main": [
+        [
+          {
+            "node": "Enregistrer le rapport",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Poster dans la messagerie",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mettre à jour l'agent reporter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Écrire dans le journal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Paris",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": true
+  },
+  "pinData": {},
+  "active": false
+}

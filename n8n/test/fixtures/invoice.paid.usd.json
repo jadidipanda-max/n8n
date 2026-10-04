@@ -1,0 +1,95 @@
+{
+  "id": "evt_1SKx9qJ8kR4mTzWQG1owUsd4",
+  "object": "event",
+  "api_version": "2026-08-26.dahlia",
+  "created": 1791117905,
+  "livemode": true,
+  "pending_webhooks": 1,
+  "request": { "id": null, "idempotency_key": null },
+  "type": "invoice.paid",
+  "data": {
+    "object": {
+      "id": "in_1SKx9nJ8kR4mTzWQG1owAe04",
+      "object": "invoice",
+      "account_country": "FR",
+      "account_name": "J-Square",
+      "amount_due": 49700,
+      "amount_overpaid": 0,
+      "amount_paid": 49700,
+      "amount_remaining": 0,
+      "attempt_count": 1,
+      "attempted": true,
+      "billing_reason": "subscription_cycle",
+      "collection_method": "charge_automatically",
+      "created": 1791114300,
+      "currency": "usd",
+      "customer": "cus_TG1owAesthet1c",
+      "customer_email": "owner@glowaesthetics.com",
+      "customer_name": "Glow Aesthetics",
+      "discounts": [],
+      "footer": "TVA non applicable – art. 259-1 du CGI",
+      "hosted_invoice_url": "https://invoice.stripe.com/i/acct_1S0jsq/live_Z2xvd2Flc3RoZXRpY3M",
+      "lines": {
+        "object": "list",
+        "data": [
+          {
+            "id": "il_1SKx9nJ8kR4mTzWQSt4rter1",
+            "object": "line_item",
+            "amount": 49700,
+            "currency": "usd",
+            "description": "1 × Starter (at $497.00 / month)",
+            "discount_amounts": [],
+            "discountable": true,
+            "discounts": [],
+            "invoice": "in_1SKx9nJ8kR4mTzWQG1owAe04",
+            "livemode": true,
+            "metadata": {},
+            "parent": {
+              "type": "subscription_item_details",
+              "invoice_item_details": null,
+              "subscription_item_details": {
+                "invoice_item": null,
+                "proration": false,
+                "proration_details": { "credited_items": null },
+                "subscription": "sub_1S8tQ2J8kR4mTzWQG1owSt01",
+                "subscription_item": "si_TG1owStarter01"
+              }
+            },
+            "period": { "end": 1793796300, "start": 1791117900 },
+            "pretax_credit_amounts": [],
+            "pricing": {
+              "price_details": { "price": "price_1S0kUsJ8kR4mTzWQStart497", "product": "prod_T0kStarterUs" },
+              "type": "price_details",
+              "unit_amount_decimal": "49700"
+            },
+            "quantity": 1,
+            "quantity_decimal": "1",
+            "subtotal": 49700,
+            "taxes": []
+          }
+        ],
+        "has_more": false,
+        "url": "/v1/invoices/in_1SKx9nJ8kR4mTzWQG1owAe04/lines"
+      },
+      "livemode": true,
+      "metadata": {},
+      "next_payment_attempt": null,
+      "number": "JSQ-2026-0023",
+      "parent": {
+        "quote_details": null,
+        "subscription_details": { "metadata": {}, "subscription": "sub_1S8tQ2J8kR4mTzWQG1owSt01" },
+        "type": "subscription_details"
+      },
+      "period_end": 1791114300,
+      "period_start": 1788522300,
+      "starting_balance": 0,
+      "status": "paid",
+      "status_transitions": { "finalized_at": 1791117900, "marked_uncollectible_at": null, "paid_at": 1791117903, "voided_at": null },
+      "subtotal": 49700,
+      "total": 49700,
+      "total_discount_amounts": [],
+      "total_pretax_credit_amounts": [],
+      "total_taxes": []
+    }
+  }
+}

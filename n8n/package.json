@@ -1,0 +1,15 @@
+{
+  "name": "cockpit-j-square-n8n",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Workflows n8n du cockpit J-Square : Stripe vers Supabase et rapport du soir (Node 22, sans dépendance).",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "verifier": "node build.js --verifier",
+    "test": "node build.js --verifier && node --test test/*.test.js"
+  }
+}
