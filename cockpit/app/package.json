@@ -1,0 +1,15 @@
+{
+  "name": "cockpit-j-square",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Serveur du cockpit J-Square : interface et messagerie Hermès (Node 22, sans dépendance).",
+  "main": "server.js",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  }
+}
