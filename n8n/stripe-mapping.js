@@ -5,7 +5,9 @@
 //
 // Fonction pure (aucun appel réseau, aucune horloge) :
 //   transformerEvenementStripe(evenement, contexte)
-//     -> { paiements: [...], abonnements: [...], journal: [...], actions: [...] }
+//     -> { clients: [...], paiements: [...], abonnements: [...], journal: [...], actions: [...] }
+//   clients : la fiche du client abonné (créée par n8n si elle n'existe pas encore,
+//             jamais écrasée : on_conflict=stripe_customer_id + ignore-duplicates)
 //   contexte = { client, tauxUsdEur, sourceTaux }
 //     client      : le client Stripe lu par n8n (ou une charge avec le client
 //                   déplié, pour un litige), sinon null
@@ -44,7 +46,7 @@ const EVENEMENTS_GERES = [
 // Petits outils
 // ---------------------------------------------------------------------
 function vide() {
-  return { paiements: [], abonnements: [], journal: [], actions: [] };
+  return { clients: [], paiements: [], abonnements: [], journal: [], actions: [] };
 }
 
 function enUnites(centimes) {
@@ -99,6 +101,14 @@ function dateLisible(secondes, marche) {
   if (!secondes) return '';
   return new Intl.DateTimeFormat('fr-FR', {
     day: 'numeric', month: 'long', year: 'numeric', timeZone: fuseauMarche(marche),
+  }).format(new Date(Number(secondes) * 1000));
+}
+
+// Date du jour (AAAA-MM-JJ) à l'heure du marché, pour une date Stripe (secondes)
+function jourMarche(secondes, marche) {
+  if (!secondes) return null;
+  return new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric', month: '2-digit', day: '2-digit', timeZone: fuseauMarche(marche),
   }).format(new Date(Number(secondes) * 1000));
 }
 
@@ -280,6 +290,20 @@ function rowPaiement(champs) {
   };
 }
 
+// Fiche client (table clients) d'un client Stripe abonné. Toujours les mêmes colonnes.
+// La base relie ensuite paiements et abonnements à cette fiche (stripe_customer_id).
+function rowClient(champs) {
+  return {
+    stripe_customer_id: champs.stripe_customer_id,
+    marche: champs.marche,
+    nom: champs.nom,
+    devise: champs.devise,
+    prix_mensuel: champs.prix_mensuel === undefined ? null : champs.prix_mensuel,
+    debut: champs.debut || null,
+    fin_engagement: champs.fin_engagement || null,
+  };
+}
+
 function suffixeTest(objet) {
   return objet && objet.livemode === false ? ' (test)' : '';
 }
@@ -375,6 +399,20 @@ function facturePayee(evenement, facture, contexte) {
     }));
     morceaux.push(montantLisible(montant, devise) + (type === 'abonnement' ? '' : ' ' + type.replace(/_/g, ' ')));
   });
+
+  // Facture d'abonnement : la fiche client est créée si elle n'existe pas encore
+  const idClient = idDe(facture.customer);
+  if (abonnement && idClient && sortie.paiements.length) {
+    const recurrent = groupes[typeRecurrent];
+    sortie.clients.push(rowClient({
+      stripe_customer_id: idClient,
+      marche: marche,
+      nom: nom,
+      devise: devise,
+      prix_mensuel: recurrent && recurrent.centimes > 0 ? arrondi(enUnites(recurrent.centimes) / intervalle, 2) : null,
+      debut: jourMarche((facture.status_transitions && facture.status_transitions.paid_at) || evenement.created, marche),
+    }));
+  }
 
   const total = enUnites(paye);
   sortie.journal.push({ marche: marche, agent: AGENT_ARGENT,
@@ -491,6 +529,22 @@ function evenementAbonnement(evenement, abonnement, contexte) {
   const nom = nomClient(client, abonnement);
   const ligne = ligneAbonnement(abonnement, marche);
   sortie.abonnements.push(ligne);
+
+  // Nouvel abonnement actif (ou en essai) : la fiche client est créée si elle n'existe pas encore.
+  // Un abonnement « incomplete » attend son premier paiement (invoice.paid créera la fiche).
+  if (evenement.type === 'customer.subscription.created' && ligne.stripe_customer_id &&
+      (ligne.statut === 'active' || ligne.statut === 'trialing') &&
+      (ligne.devise === 'EUR' || ligne.devise === 'USD')) {
+    sortie.clients.push(rowClient({
+      stripe_customer_id: ligne.stripe_customer_id,
+      marche: marche,
+      nom: nom,
+      devise: ligne.devise,
+      prix_mensuel: ligne.montant > 0 ? arrondi(ligne.montant / ligne.intervalle_mois, 2) : null,
+      debut: jourMarche(abonnement.start_date, marche),
+      fin_engagement: ligne.fin_engagement ? jourMarche(Date.parse(ligne.fin_engagement) / 1000, marche) : null,
+    }));
+  }
 
   const prix = montantLisible(ligne.montant, ligne.devise) + rythme(ligne);
   const test = suffixeTest(abonnement);

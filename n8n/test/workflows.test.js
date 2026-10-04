@@ -148,6 +148,7 @@ describe('stripe-vers-supabase : nœuds', () => {
 
   test('écritures Supabase : URL, on_conflict et Prefer du contrat, clé secrète n8n', () => {
     const attendu = {
+      'Créer la fiche client': ['clients?on_conflict=stripe_customer_id', 'resolution=ignore-duplicates,return=minimal'],
       'Enregistrer les paiements': ['paiements?on_conflict=stripe_event_id', 'resolution=ignore-duplicates,return=minimal'],
       'Mettre à jour l\'abonnement': ['abonnements?on_conflict=stripe_subscription_id', 'resolution=merge-duplicates,return=minimal'],
       'Créer l\'action à valider': ['actions', 'return=minimal'],
@@ -189,6 +190,14 @@ describe('stripe-vers-supabase : exécution simulée', () => {
     assert.equal(ecritures(appels, 'journal').length, 1);
     assert.equal(ecritures(appels, 'abonnements').length, 0);
     assert.equal(ecritures(appels, 'actions').length, 0);
+    // fiche client créée (jamais écrasée), avant les paiements pour que la base les relie tout de suite
+    const fiches = ecritures(appels, 'clients');
+    assert.equal(fiches.length, 1);
+    assert.equal(fiches[0].url, URL_SUPABASE + '/rest/v1/clients?on_conflict=stripe_customer_id');
+    assert.equal(fiches[0].entetes.Prefer, 'resolution=ignore-duplicates,return=minimal');
+    assert.deepEqual(fiches[0].corps.map((c) => [c.stripe_customer_id, c.nom, c.marche, c.prix_mensuel]),
+      [['cus_TAu7r0reInst1t', 'Institut Aurore', 'fr', 390]]);
+    assert.ok(resultat.ordre.indexOf('Créer la fiche client') < resultat.ordre.indexOf('Enregistrer les paiements'));
     // ordre v1 : les paiements sont écrits avant le journal
     assert.ok(resultat.ordre.indexOf('Enregistrer les paiements') < resultat.ordre.indexOf('Écrire dans le journal'));
   });

@@ -1,0 +1,2 @@
+# Réglages réels du serveur (secrets) : jamais dans git.
+.env

@@ -1,0 +1,34 @@
+# Caddy : HTTPS automatique (Let's Encrypt) pour les deux sous-domaines du cockpit J-Square.
+# DOMAINE, EMAIL_ACME et le port du cockpit (PORT) viennent de deploy/.env (voir docker-compose.yml).
+# L'API Hermès n'apparaît pas ici : elle n'est jamais exposée sur Internet.
+{
+	email {$EMAIL_ACME}
+}
+
+# En-têtes de sécurité communs. Le « ? » pose l'en-tête seulement si l'application
+# ne l'a pas déjà mis (le cockpit envoie sa propre CSP, X-Frame-Options et Referrer-Policy).
+(securite) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		?X-Content-Type-Options "nosniff"
+		?Referrer-Policy "strict-origin-when-cross-origin"
+		?Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		-Server
+		-Via
+		-X-Powered-By
+	}
+}
+
+cockpit.{$DOMAINE} {
+	import securite
+	header ?X-Frame-Options "DENY"
+	encode zstd gzip
+	reverse_proxy cockpit:{$COCKPIT_PORT:8080}
+}
+
+# n8n se protège lui-même par son écran de connexion (compte propriétaire).
+n8n.{$DOMAINE} {
+	import securite
+	header ?X-Frame-Options "SAMEORIGIN"
+	reverse_proxy n8n:5678
+}

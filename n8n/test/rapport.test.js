@@ -67,6 +67,18 @@ describe('demande envoyée à Hermès', () => {
     }
     assert.equal(r.construireDemandeHermes({ jour: JOUR }).model, 'hermes-agent');
   });
+
+  test('la consigne nomme chaque clé de « donnees » que l\'interface affiche (salle Rapport du soir)', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const app = fs.readFileSync(path.join(__dirname, '..', '..', 'cockpit', 'app', 'public', 'app.js'), 'utf8');
+    const salle = app.slice(app.indexOf('report() {'), app.indexOf('research() {'));
+    assert.ok(salle.length > 0, 'salle report() introuvable dans app.js');
+    const cles = [...new Set([...salle.matchAll(/\bd\.([a-z_]+)/g)].map((m) => m[1]))];
+    assert.ok(cles.includes('demos_total') && cles.includes('demos_necessaires'), cles.join(','));
+    const consigne = r.construireDemandeHermes({ jour: JOUR }).messages[1].content;
+    for (const cle of cles) assert.ok(consigne.includes('"' + cle + '"'), 'la consigne ne demande pas ' + cle);
+  });
 });
 
 describe('lecture de la réponse', () => {

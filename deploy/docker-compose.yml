@@ -1,0 +1,155 @@
+# Cockpit J-Square : Caddy (HTTPS), n8n, le serveur du cockpit et le relais vers Hermès.
+# Contrat technique, section 5. Lancement (dans ce dossier) : docker compose up -d
+# Les réglages viennent du fichier .env posé à côté (modèle : .env.example).
+# Seul Caddy ouvre des ports sur Internet (80 et 443). n8n et le cockpit restent
+# sur le réseau interne « jsquare ». L'API Hermès n'est jamais exposée.
+
+name: jsquare
+
+services:
+  caddy:
+    # Version figée (image officielle « caddy » sur Docker Hub, publiée le 2 octobre 2026).
+    image: caddy:2.11.6-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      DOMAINE: ${DOMAINE:?Remplis DOMAINE dans deploy/.env (lance scripts/configurer.sh)}
+      EMAIL_ACME: ${EMAIL_ACME:?Remplis EMAIL_ACME dans deploy/.env (lance scripts/configurer.sh)}
+      COCKPIT_PORT: ${PORT:-8080} # même port que le cockpit
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # certificats HTTPS : à garder
+      - caddy_config:/config
+    depends_on:
+      - cockpit
+      - n8n
+    networks:
+      - jsquare
+
+  n8n:
+    # Version figée : « stable » de n8n au 4 octobre 2026 (npm dist-tag stable = 2.41.6,
+    # image Docker Hub n8nio/n8n:2.41.6 du 2 octobre 2026). Les workflows du dossier n8n/
+    # demandent 2.26.2 ou plus. Pour changer de version : modifier ce numéro, puis
+    # docker compose pull n8n && docker compose up -d n8n (après une sauvegarde).
+    image: n8nio/n8n:2.41.6
+    restart: unless-stopped
+    environment:
+      # Variables vérifiées sur docs.n8n.io (Deployment, Endpoints, Security, SSRF protection,
+      # Timezone, Manage settings using environment variables).
+      N8N_HOST: n8n.${DOMAINE}
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: https
+      N8N_EDITOR_BASE_URL: https://n8n.${DOMAINE}/
+      N8N_WEBHOOK_URL: https://n8n.${DOMAINE}/ # nouveau nom de WEBHOOK_URL (déprécié depuis 2.35.0)
+      N8N_PROXY_HOPS: "1" # derrière Caddy
+      NODE_ENV: production
+      GENERIC_TIMEZONE: Europe/Paris
+      TZ: Europe/Paris
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Remplis N8N_ENCRYPTION_KEY dans deploy/.env (lance scripts/configurer.sh)}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "true"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      N8N_HIRING_BANNER_ENABLED: "false"
+      # Protection SSRF : les adresses privées sont bloquées, sauf Hermès (host.docker.internal).
+      N8N_SSRF_PROTECTION_ENABLED: "true"
+      N8N_SSRF_ALLOWED_HOSTNAMES: host.docker.internal
+      # Compte propriétaire créé d'avance (évite qu'un inconnu le crée avant Jay).
+      N8N_INSTANCE_OWNER_MANAGED_BY_ENV: ${N8N_INSTANCE_OWNER_MANAGED_BY_ENV:-false}
+      N8N_INSTANCE_OWNER_EMAIL: ${N8N_INSTANCE_OWNER_EMAIL:-}
+      N8N_INSTANCE_OWNER_FIRST_NAME: ${N8N_INSTANCE_OWNER_FIRST_NAME:-Jay}
+      N8N_INSTANCE_OWNER_LAST_NAME: ${N8N_INSTANCE_OWNER_LAST_NAME:-J-Square}
+      N8N_INSTANCE_OWNER_PASSWORD_HASH: ${N8N_INSTANCE_OWNER_PASSWORD_HASH:-}
+    volumes:
+      - n8n_data:/home/node/.n8n # base SQLite et réglages : sauvegardée chaque nuit
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # pour joindre Hermès (par le relais)
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5678/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - jsquare
+
+  cockpit:
+    image: node:22-alpine
+    restart: unless-stopped
+    user: node
+    working_dir: /app
+    command: ["node", "server.js"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      # Variables lues par cockpit/app/server.js (contrat, section 2).
+      NODE_ENV: production
+      PORT: ${PORT:-8080}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
+      HERMES_URL: ${HERMES_URL:-http://host.docker.internal:8642}
+      HERMES_API_KEY: ${HERMES_API_KEY:-}
+      HERMES_MODEL: ${HERMES_MODEL:-hermes-agent}
+      DEMO: ${DEMO:-0}
+    volumes:
+      - ../cockpit/app:/app:ro # le code du cockpit, en lecture seule
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # pour joindre Hermès (par le relais)
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    networks:
+      - jsquare
+
+  # Hermès écoute sur 127.0.0.1:8642 de l'hôte, que les conteneurs ne voient pas :
+  # dans un conteneur, host.docker.internal (host-gateway) est l'adresse du pont docker0
+  # (172.17.0.1 par défaut), pas 127.0.0.1. Ce relais tourne sur le réseau de l'hôte,
+  # écoute sur cette adresse privée et recopie chaque connexion vers 127.0.0.1:8642.
+  # Le pare-feu (ufw) n'ouvre ce port qu'au réseau « jsquare » ; il reste fermé depuis Internet.
+  relais-hermes:
+    image: node:22-alpine
+    restart: unless-stopped
+    network_mode: host
+    user: node
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command: ["node", "/relais/relais-hermes.js"]
+    environment:
+      RELAIS_IP: ${HERMES_RELAIS_IP:-172.17.0.1}
+      RELAIS_PORT: "8642"
+      CIBLE_IP: 127.0.0.1
+      CIBLE_PORT: "8642"
+    volumes:
+      - ./hermes/relais-hermes.js:/relais/relais-hermes.js:ro
+
+networks:
+  jsquare:
+    name: jsquare
+    driver: bridge
+    ipam:
+      config:
+        # Même plage que la règle du pare-feu dans scripts/installer-vps.sh.
+        - subnet: 172.30.10.0/24
+
+volumes:
+  n8n_data:
+    name: jsquare_n8n_data
+  caddy_data:
+    name: jsquare_caddy_data
+  caddy_config:
+    name: jsquare_caddy_config

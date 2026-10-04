@@ -251,11 +251,18 @@ function construireStripeVersSupabase(reglages) {
       'return [{ json: Object.assign({ evenement: evenement.id, type: evenement.type, taux: taux }, lignes) }];',
     ])),
     noeudAiguillage(wf, 'Écrire dans Supabase', [1760, 0], [
+      ['clients', 'Fiche client'],
       ['paiements', 'Paiements'],
       ['abonnements', 'Abonnements'],
       ['actions', 'Actions'],
       ['journal', 'Journal'],
     ]),
+    // Fiche client créée une seule fois, jamais écrasée (Jay peut la compléter à la main)
+    noeudSupabase(wf, 'Créer la fiche client', [2000, -400], {
+      chemin: 'clients?on_conflict=stripe_customer_id',
+      prefer: 'resolution=ignore-duplicates,return=minimal',
+      corps: '$json.clients',
+    }),
     noeudSupabase(wf, 'Enregistrer les paiements', [2000, -240], {
       chemin: 'paiements?on_conflict=stripe_event_id',
       prefer: 'resolution=ignore-duplicates,return=minimal',
@@ -286,6 +293,7 @@ function construireStripeVersSupabase(reglages) {
     'Transformer': { main: [[lien('Écrire dans Supabase')]] },
     'Écrire dans Supabase': {
       main: [
+        [lien('Créer la fiche client')],
         [lien('Enregistrer les paiements')],
         [lien('Mettre à jour l\'abonnement')],
         [lien('Créer l\'action à valider')],

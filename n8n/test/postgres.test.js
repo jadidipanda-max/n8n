@@ -86,7 +86,8 @@ function sqlEcriture(table, lignes, conflit, resolution) {
 }
 
 function sqlStripe(sortie) {
-  return sqlEcriture('paiements', sortie.paiements, 'stripe_event_id', 'ignore') +
+  return sqlEcriture('clients', sortie.clients, 'stripe_customer_id', 'ignore') +
+    sqlEcriture('paiements', sortie.paiements, 'stripe_event_id', 'ignore') +
     sqlEcriture('abonnements', sortie.abonnements, 'stripe_subscription_id', 'merge') +
     sqlEcriture('actions', sortie.actions) +
     sqlEcriture('journal', sortie.journal);
@@ -141,8 +142,30 @@ test('les lignes Stripe entrent dans la vraie base (contraintes, triggers, doubl
     "'client', client_id is not null) order by stripe_subscription_id) from public.abonnements;"));
   assert.deepEqual(abonnements, [
     { id: 'sub_1RqAu7J8kR4mTzWQAur0re00', statut: 'active', annule: true, client: true },
-    { id: 'sub_1S8tQ2J8kR4mTzWQG1owSt01', statut: 'canceled', annule: true, client: false },
+    { id: 'sub_1S8tQ2J8kR4mTzWQG1owSt01', statut: 'canceled', annule: true, client: true },
   ]);
+});
+
+test('n8n crée la fiche des nouveaux clients abonnés, sans écraser une fiche existante', (t) => {
+  if (!disponible) return t.skip('Postgres indisponible : ' + raison);
+  const clients = JSON.parse(psql(BASE,
+    "select json_agg(json_build_object('cus', stripe_customer_id, 'nom', nom, 'marche', marche, 'debut', debut, " +
+    "'prix', prix_mensuel) order by stripe_customer_id) from public.clients;"));
+  const parId = Object.fromEntries(clients.map((c) => [c.cus, c]));
+  // fiche saisie avant (Institut Aurore) : intacte
+  assert.equal(parId.cus_TAu7r0reInst1t.debut, '2026-08-04');
+  assert.equal(parId.cus_TAu7r0reInst1t.prix, null);
+  // fiches créées par n8n : clients abonnés qui ont payé
+  assert.ok(parId.cus_TG1owAesthet1c, 'fiche Glow Aesthetics absente');
+  assert.equal(parId.cus_TG1owAesthet1c.marche, 'us');
+  assert.equal(Number(parId.cus_TG1owAesthet1c.prix), 497);
+  // un client en impayé n'a pas de fiche créée par un paiement
+  assert.equal(parId.cus_TAte1ierB0isPl, undefined);
+  // chaque paiement d'un client qui a une fiche y est relié (dans les deux sens)
+  const orphelins = psql(BASE,
+    'select count(*) from public.paiements p join public.clients c on c.stripe_customer_id = p.stripe_customer_id ' +
+    'where p.client_id is distinct from c.id;');
+  assert.equal(orphelins, '0');
 });
 
 test('invoice.payment_failed : action en attente, verrouillée, journal écrit par la base', (t) => {
@@ -170,6 +193,19 @@ test('les vues de cash comptent les paiements de n8n', (t) => {
   // MRR : seul l'abonnement actif d'Institut Aurore (390 €/mois) compte
   assert.equal(Number(resume.fr.mrr), 390);
   assert.equal(Number(resume.us.mrr), 0);
+});
+
+test('« signés ce mois » compte les fiches créées par n8n', (t) => {
+  if (!disponible) return t.skip('Postgres indisponible : ' + raison);
+  const attendu = JSON.parse(psql(BASE,
+    "select json_object_agg(marche, n) from (select marche, count(*) as n from public.clients " +
+    "where debut >= '2026-10-01' and debut < '2026-11-01' group by marche) x;")) || {};
+  assert.ok(Object.values(attendu).reduce((a, b) => a + b, 0) >= 1, 'aucune fiche créée en octobre');
+  const resume = JSON.parse(psql(BASE,
+    "set role service_role; select json_object_agg(marche, clients_signes_mois) from public.cash_resume_au('2026-10-15 12:00+02');"));
+  assert.equal(resume.fr, attendu.fr || 0);
+  assert.equal(resume.us, attendu.us || 0);
+  assert.equal(resume.total, (attendu.fr || 0) + (attendu.us || 0));
 });
 
 test('les lignes du rapport du soir entrent dans la base, et un 2e passage remplace le rapport', (t) => {

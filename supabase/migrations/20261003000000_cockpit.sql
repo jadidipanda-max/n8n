@@ -105,7 +105,7 @@ create table if not exists public.couts (
 
 create table if not exists public.appels (
   id        uuid primary key default gen_random_uuid(),
-  marche    text not null,
+  marche    text not null check (marche in ('fr', 'us')),
   ecran     text not null,
   lead_ref  text not null,
   statut    text,
@@ -190,6 +190,15 @@ create index if not exists paiements_marche_paye_le_idx on public.paiements (mar
 create index if not exists journal_cree_le_idx          on public.journal (cree_le desc);
 create index if not exists messages_cree_le_idx         on public.messages (cree_le desc);
 create index if not exists actions_statut_cree_le_idx   on public.actions (statut, cree_le);
+create index if not exists messages_auteur_cree_le_idx  on public.messages (auteur_id, cree_le desc);
+
+-- Base créée avant l'ajout du contrôle : appels.marche vaut fr ou us
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conrelid = 'public.appels'::regclass and conname = 'appels_marche_check') then
+    alter table public.appels add constraint appels_marche_check check (marche in ('fr', 'us'));
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------
 -- 1.1 Fonctions d'identité (utilisées par les règles RLS)
@@ -246,6 +255,66 @@ create or replace trigger paiements_relier_client before insert or update on pub
 create or replace trigger abonnements_relier_client before insert or update on public.abonnements
   for each row execute function public.relier_client();
 
+-- Fiche client ajoutée (ou reliée à Stripe) après ses premiers paiements : on rattache l'historique
+create or replace function public.rattacher_historique_client() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.stripe_customer_id is not null then
+    update public.paiements   set client_id = new.id
+     where stripe_customer_id = new.stripe_customer_id and client_id is null;
+    update public.abonnements set client_id = new.id
+     where stripe_customer_id = new.stripe_customer_id and client_id is null;
+  end if;
+  return null;
+end;
+$$;
+
+create or replace trigger clients_rattacher_historique after insert or update of stripe_customer_id on public.clients
+  for each row execute function public.rattacher_historique_client();
+
+-- Fiches clients : seul l'admin (ou n8n) relie une fiche à Stripe ;
+-- une fiche créée par n8n appartient à l'associé de son marché.
+create or replace function public.clients_avant_ecriture() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if auth.uid() is not null and not public.est_admin() then
+    if (tg_op = 'INSERT' and new.stripe_customer_id is not null)
+       or (tg_op = 'UPDATE' and new.stripe_customer_id is distinct from old.stripe_customer_id) then
+      raise exception 'Seul Jay (admin) peut relier une fiche client à Stripe.' using errcode = '42501';
+    end if;
+  end if;
+  if tg_op = 'INSERT' and new.owner_id is null then
+    select p.id into new.owner_id from public.profils p where p.marche = new.marche order by p.cree_le, p.id limit 1;
+  end if;
+  return new;
+end;
+$$;
+
+create or replace trigger clients_avant_ecriture before insert or update on public.clients
+  for each row execute function public.clients_avant_ecriture();
+
+-- Messages écrits par Jay ou Junior : date posée par la base (jamais dans le futur)
+-- et 30 messages par minute au plus, même en passant à côté du serveur du cockpit.
+create or replace function public.messages_avant_ajout() returns trigger
+language plpgsql set search_path = public as $$
+declare
+  v_nb int;
+begin
+  if auth.uid() is not null and new.auteur in ('jay', 'junior') then
+    new.cree_le := now();
+    select count(*) into v_nb from public.messages
+     where auteur_id = new.auteur_id and cree_le > now() - interval '1 minute';
+    if v_nb >= 30 then
+      raise exception 'Trop de messages d''un coup : attends une minute.' using errcode = 'P0001';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+create or replace trigger messages_avant_ajout before insert on public.messages
+  for each row execute function public.messages_avant_ajout();
+
 -- ---------------------------------------------------------------------
 -- 1.3 Réglages (n'écrase jamais une valeur déjà modifiée)
 -- ---------------------------------------------------------------------
@@ -272,7 +341,7 @@ begin
   end loop;
 end $$;
 
--- clients et appels : l'admin, ou le propriétaire de la ligne
+-- clients et appels : l'admin, ou le propriétaire de la ligne sur son propre marché
 do $$
 declare t text;
 begin
@@ -281,12 +350,12 @@ begin
     execute format('drop policy if exists modif_proprietaire on public.%I', t);
     execute format('drop policy if exists suppr_proprietaire on public.%I', t);
     execute format('create policy ajout_proprietaire on public.%I for insert to authenticated
-                      with check (public.est_admin() or owner_id = (select auth.uid()))', t);
+                      with check (public.est_admin() or (owner_id = (select auth.uid()) and marche = public.mon_marche()))', t);
     execute format('create policy modif_proprietaire on public.%I for update to authenticated
-                      using (public.est_admin() or owner_id = (select auth.uid()))
-                      with check (public.est_admin() or owner_id = (select auth.uid()))', t);
+                      using (public.est_admin() or (owner_id = (select auth.uid()) and marche = public.mon_marche()))
+                      with check (public.est_admin() or (owner_id = (select auth.uid()) and marche = public.mon_marche()))', t);
     execute format('create policy suppr_proprietaire on public.%I for delete to authenticated
-                      using (public.est_admin() or owner_id = (select auth.uid()))', t);
+                      using (public.est_admin() or (owner_id = (select auth.uid()) and marche = public.mon_marche()))', t);
   end loop;
 end $$;
 
@@ -297,6 +366,8 @@ create policy ajout_mes_messages on public.messages for insert to authenticated
     auteur_id = (select auth.uid())
     and public.est_membre()
     and auteur = case when public.est_admin() then 'jay' else 'junior' end
+    and type = 'message'
+    and coalesce(meta, '{}'::jsonb) = '{}'::jsonb
   );
 
 -- reglages, objectifs, couts : l'admin seulement
@@ -315,11 +386,21 @@ end $$;
 -- ---------------------------------------------------------------------
 -- 1.5 File « À valider » et autonomie
 -- ---------------------------------------------------------------------
--- Types d'action toujours verrouillés (argent, prix, contrat, premier message à un client)
+-- Types d'action toujours verrouillés (argent, prix, contrat, premier message à un client).
+-- Le type est normalisé (minuscules, sans accents, séparateur « _ ») puis comparé à une liste
+-- et à des familles de mots : « Changer_prix », « rembourser_client » ou « envoyer_paiement »
+-- restent verrouillés.
 create or replace function public.type_action_verrouille(p_type text) returns boolean
 language sql immutable set search_path = public as $$
-  select p_type in ('relance_impaye', 'changer_prix', 'envoyer_argent', 'rembourser', 'mission_apify',
-                    'envoyer_contrat', 'signer_contrat', 'premier_message');
+  with t as (
+    select regexp_replace(translate(lower(btrim(coalesce(p_type, ''))), 'àâäéèêëîïôöùûüç', 'aaaeeeeiioouuuc'),
+                          '[^a-z0-9]+', '_', 'g') as v
+  )
+  select t.v in ('relance_impaye', 'changer_prix', 'envoyer_argent', 'rembourser', 'mission_apify',
+                 'envoyer_contrat', 'signer_contrat', 'premier_message')
+      or t.v ~ '(^|_)(rembours[a-z]*|payer|paye|paiement|paiements|virement|argent|impaye|impayes|litige|contrat|contrats|apify|premier_message)(_|$)'
+      or t.v ~ '(^|_)(changer|modifier|baisser|monter|augmenter|reduire|fixer|appliquer)_([a-z0-9]+_)*(prix|tarif|tarifs|remise)(_|$)'
+    from t;
 $$;
 
 -- À chaque nouvelle action : ligne d'autonomie créée si besoin, verrou appliqué,
@@ -413,9 +494,13 @@ begin
   on conflict (agent, type_action) do nothing;
 
   if p_ok and v_correction is null then
-    update public.autonomie
-       set ok_consecutifs = ok_consecutifs + 1
-     where agent = v_action.agent and type_action = v_action.type_action;
+    -- l'autonomie est commune aux deux marchés : seuls les OK de l'admin la font monter
+    -- (sinon les OK de Junior sur les USA rendraient autonomes les actions France)
+    if v_profil.role = 'admin' then
+      update public.autonomie
+         set ok_consecutifs = ok_consecutifs + 1
+       where agent = v_action.agent and type_action = v_action.type_action;
+    end if;
   else
     -- refus ou correction : le compteur repart de zéro et le niveau baisse d'un cran
     update public.autonomie
@@ -453,6 +538,11 @@ begin
   on conflict (agent, type_action) do nothing;
 
   select * into v_ligne from public.autonomie where agent = p_agent and type_action = p_type for update;
+  if public.type_action_verrouille(p_type) and not v_ligne.verrou then
+    update public.autonomie set verrou = true, niveau = 0, ok_consecutifs = 0
+     where agent = p_agent and type_action = p_type
+    returning * into v_ligne;
+  end if;
   if v_ligne.verrou and p_niveau > 0 then
     raise exception 'Action verrouillée : elle demande toujours une validation (niveau 0).' using errcode = 'P0001';
   end if;
@@ -825,6 +915,7 @@ grant all on public.profils, public.reglages, public.clients, public.abonnements
 revoke execute on function
   public.est_membre(), public.est_admin(), public.mon_marche(), public.lecture_autorisee(),
   public.touche_maj(), public.relier_client(), public.type_action_verrouille(text), public.actions_avant_ajout(),
+  public.rattacher_historique_client(), public.clients_avant_ecriture(), public.messages_avant_ajout(),
   public.decider_action(uuid, boolean, text), public.changer_autonomie(text, text, int),
   public.taux_usd_eur(), public.devise_marche(text), public.convertir(numeric, text, text),
   public.montant_marche(numeric, numeric, text, text),

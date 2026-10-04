@@ -453,7 +453,15 @@ function showAuth(mode, info) {
   const li = $('#loginInfo'); li.hidden = !info; li.textContent = info || '';
   $('#demoLink').hidden = !!config.demo;
   const focus = { login: '#loginEmail', forgot: '#forgotEmail', recover: '#newPassword' }[mode];
-  setTimeout(() => { const f = $(focus); if (f) f.focus(); }, 30);
+  // Curseur dans le premier champ, sauf si la personne (ou le remplissage automatique)
+  // est déjà dans un champ : sinon la suite de sa saisie partirait dans le mauvais champ.
+  const placer = () => {
+    const f = $(focus), actif = document.activeElement;
+    const dansUnChamp = actif && /^(INPUT|TEXTAREA|SELECT)$/.test(actif.tagName) && actif.offsetParent !== null;
+    if (f && !dansUnChamp) f.focus();
+  };
+  placer();
+  setTimeout(placer, 30);
 }
 function formError(id, texte, champ) {
   const el = $('#' + id); el.textContent = texte; el.hidden = !texte;

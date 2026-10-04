@@ -18,6 +18,8 @@ const COLONNES_ABONNEMENT = ['stripe_subscription_id', 'stripe_customer_id', 'ma
   'devise', 'intervalle_mois', 'debut', 'fin_engagement', 'prochaine_facture', 'annule_le'];
 const COLONNES_JOURNAL = ['marche', 'agent', 'texte'];
 const COLONNES_ACTION = ['marche', 'agent', 'type_action', 'titre', 'details'];
+const COLONNES_CLIENT = ['stripe_customer_id', 'marche', 'nom', 'devise', 'prix_mensuel', 'debut', 'fin_engagement'];
+const JOUR = /^\d{4}-\d{2}-\d{2}$/;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 function transformer(nom, options) {
@@ -38,7 +40,16 @@ function centimes(montant) {
 
 // Vérifie la forme de toutes les lignes produites (colonnes exactes, types)
 function verifierForme(sortie) {
-  assert.deepEqual(Object.keys(sortie).sort(), ['abonnements', 'actions', 'journal', 'paiements']);
+  assert.deepEqual(Object.keys(sortie).sort(), ['abonnements', 'actions', 'clients', 'journal', 'paiements']);
+  for (const c of sortie.clients) {
+    assert.deepEqual(Object.keys(c).sort(), COLONNES_CLIENT.slice().sort());
+    assert.match(c.stripe_customer_id, /^cus_/);
+    assert.ok(['fr', 'us'].includes(c.marche));
+    assert.ok(['EUR', 'USD'].includes(c.devise));
+    assert.ok(c.nom && typeof c.nom === 'string');
+    assert.match(c.debut, JOUR);
+    if (c.fin_engagement !== null) assert.match(c.fin_engagement, JOUR);
+  }
   for (const p of sortie.paiements) {
     assert.deepEqual(Object.keys(p).sort(), COLONNES_PAIEMENT.slice().sort());
     assert.ok(m.TYPES_PAIEMENT.includes(p.type), 'type inconnu : ' + p.type);
@@ -62,6 +73,7 @@ function verifierForme(sortie) {
   verifierColonnes(assert, TABLES, 'abonnements', sortie.abonnements);
   verifierColonnes(assert, TABLES, 'journal', sortie.journal);
   verifierColonnes(assert, TABLES, 'actions', sortie.actions);
+  verifierColonnes(assert, TABLES, 'clients', sortie.clients);
 }
 
 // Convertit une facture « forme récente » (basil et après) en « forme ancienne » (acacia)
@@ -492,7 +504,7 @@ describe('charge.refunded et charge.dispute.created', () => {
 
 describe('robustesse et outils', () => {
   test('événement non géré ou incomplet : rien à écrire', () => {
-    const vide = { paiements: [], abonnements: [], journal: [], actions: [] };
+    const vide = { clients: [], paiements: [], abonnements: [], journal: [], actions: [] };
     assert.deepEqual(m.transformerEvenementStripe({ type: 'customer.created', data: { object: { id: 'cus_x' } } }), vide);
     assert.deepEqual(m.transformerEvenementStripe(null), vide);
     assert.deepEqual(m.transformerEvenementStripe({ type: 'invoice.paid' }), vide);
@@ -559,5 +571,64 @@ describe('robustesse et outils', () => {
   test('montantLisible : format français', () => {
     assert.equal(sansEspaces(m.montantLisible(1280, 'EUR')), '1280€');
     assert.equal(sansEspaces(m.montantLisible(997.5, 'USD')), '997,50$');
+  });
+});
+
+describe('fiche client (table clients)', () => {
+  test('invoice.paid d\'un abonnement : fiche du client avec son prix mensuel et sa date de début', () => {
+    const s = transformer('invoice.paid.mensuel-eur.json');
+    verifierForme(s);
+    assert.deepEqual(s.clients, [{
+      stripe_customer_id: 'cus_TAu7r0reInst1t', marche: 'fr', nom: 'Institut Aurore', devise: 'EUR',
+      prix_mensuel: 390, debut: s.paiements[0].paye_le.slice(0, 10), fin_engagement: null,
+    }]);
+  });
+
+  test('pack 3 mois : prix mensuel = montant du pack / 3', () => {
+    const s = transformer('invoice.paid.pack-3-mois.json');
+    verifierForme(s);
+    assert.equal(s.clients.length, 1);
+    const pack = s.paiements.find((p) => p.type === 'pack');
+    assert.equal(s.clients[0].prix_mensuel, Math.round(pack.montant / 3 * 100) / 100);
+  });
+
+  test('USD : fiche sur le marché us, date du jour à New York', () => {
+    const s = transformer('invoice.paid.usd.json');
+    verifierForme(s);
+    assert.equal(s.clients.length, 1);
+    assert.equal(s.clients[0].marche, 'us');
+    assert.equal(s.clients[0].devise, 'USD');
+    assert.equal(s.clients[0].prix_mensuel, 497);
+  });
+
+  test('customer.subscription.created actif : fiche avec fin d\'engagement', () => {
+    const ev = fixture('customer.subscription.updated.cancel_at.json');
+    ev.type = 'customer.subscription.created';
+    ev.data.previous_attributes = undefined;
+    const s = transformer(ev);
+    verifierForme(s);
+    assert.equal(s.clients.length, 1);
+    assert.equal(s.clients[0].stripe_customer_id, 'cus_TAu7r0reInst1t');
+    assert.equal(s.clients[0].fin_engagement, s.abonnements[0].fin_engagement.slice(0, 10));
+  });
+
+  test('abonnement « incomplete » ou mise à jour : pas de fiche (le premier paiement la créera)', () => {
+    const ev = fixture('customer.subscription.updated.cancel_at.json');
+    ev.type = 'customer.subscription.created';
+    ev.data.object.status = 'incomplete';
+    assert.deepEqual(transformer(ev).clients, []);
+    assert.deepEqual(transformer('customer.subscription.updated.cancel_at.json').clients, []);
+    assert.deepEqual(transformer('customer.subscription.deleted.json').clients, []);
+  });
+
+  test('paiement ponctuel, impayé, remboursement, litige : pas de fiche client', () => {
+    for (const nom of ['invoice.payment_failed.json', 'charge.refunded.partiel.json', 'charge.dispute.created.json']) {
+      assert.deepEqual(transformer(nom).clients, [], nom);
+    }
+    const ev = fixture('invoice.paid.mensuel-eur.json');
+    delete ev.data.object.parent;
+    ev.data.object.subscription = null;
+    for (const l of ev.data.object.lines.data) { l.parent = { type: 'invoice_item_details', invoice_item_details: { invoice_item: 'ii_x', proration: false, subscription: null } }; }
+    assert.deepEqual(transformer(ev).clients, []);
   });
 });

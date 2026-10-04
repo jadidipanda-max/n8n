@@ -50,14 +50,19 @@ SUPABASE_URL=https://abcdefgh.supabase.co node n8n/build.js
 1. **Ajoute le marché sur chaque client Stripe.** Stripe → **Clients** → le client → **Métadonnées → Modifier** : clé `marche`, valeur `fr` ou `us`. Sans cette métadonnée, c'est la devise qui décide : un paiement en USD va aux US, tout le reste en France.
 2. **Active le workflow `stripe-vers-supabase`** (interrupteur en haut à droite). n8n crée lui-même le webhook dans Stripe, sur les 7 événements utiles, avec la version d'API `2026-08-26.dahlia`. **Ne crée pas de webhook à la main pour ce flux** : il enverrait les événements en double, signés avec un autre secret, et n8n les refuserait.
 3. Dans Stripe → **Developers → Webhooks**, ouvre le webhook « Created by n8n for workflow ID … », copie son **Signing secret** (`whsec_…`) et colle-le dans l'identifiant `Stripe J-Square`, champ **Signature Secret**. Avec ça, tout événement non signé par Stripe est refusé (réponse 401).
+4. **Ce secret est obligatoire.** Sans lui (champ vide, ou webhook recréé à la main), le nœud Stripe Trigger de n8n accepte n'importe quel événement, même non signé : quelqu'un qui connaît l'adresse du webhook pourrait inventer des paiements. Vérifie-le après chaque activation : copie la **Production URL** du nœud **Stripe**, puis
+   `curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' -d '{"type":"invoice.paid"}' '<Production URL>'`
+   doit afficher `401`. L'adresse du webhook est fixée dans `workflows/stripe-vers-supabase.json` (`webhookId`) : si ton dépôt GitHub est public, duplique le workflow dans n8n après l'import (menu **⋯ → Duplicate**), travaille sur la copie et supprime l'original : la copie reçoit une adresse que personne ne connaît.
 
 ### Ce que devient chaque événement
 
 | Événement Stripe | Dans Supabase |
 |---|---|
-| `invoice.paid` | 1 à 3 lignes dans `paiements` : l'abonnement (`abonnement`, ou `pack` si l'abonnement se facture tous les 2 mois ou plus), la mise en place (`mise_en_place`), un éventuel extra (`ponctuel`). Le total est toujours celui que Stripe a encaissé. Plus une ligne dans le `journal`. |
+| `invoice.paid` | 1 à 3 lignes dans `paiements` : l'abonnement (`abonnement`, ou `pack` si l'abonnement se facture tous les 2 mois ou plus), la mise en place (`mise_en_place`), un éventuel extra (`ponctuel`). Le total est toujours celui que Stripe a encaissé. Plus une ligne dans le `journal`. Si la facture vient d'un abonnement et que le client n'a pas encore de fiche dans `clients`, n8n la crée (nom, marché, devise, prix mensuel, date de début). |
 | `invoice.payment_failed` | une action `relance_impaye` dans la file « À valider ». Elle reste toujours soumise à ta validation. Rien d'autre. |
-| `customer.subscription.created` / `.updated` / `.deleted` | la ligne de l'abonnement dans `abonnements` (créée ou mise à jour), plus une ligne de journal pour un nouvel abonnement, une résiliation programmée ou annulée, un retard de paiement ou une fin. |
+| `customer.subscription.created` / `.updated` / `.deleted` | la ligne de l'abonnement dans `abonnements` (créée ou mise à jour), plus une ligne de journal pour un nouvel abonnement, une résiliation programmée ou annulée, un retard de paiement ou une fin. Un nouvel abonnement actif (ou en essai) crée aussi la fiche du client dans `clients` si elle n'existe pas encore. |
+
+**Fiches clients.** n8n ne remplace jamais une fiche qui existe déjà : tu peux la compléter à la main dans Supabase (niche, palier, objectif garanti…). Une fiche créée par n8n appartient à l'associé du marché (Jay pour la France, Junior pour les USA). Si tu crées une fiche à la main, mets dans `stripe_customer_id` l'identifiant `cus_…` du client Stripe : la base y rattache alors ses paiements, même ceux arrivés avant.
 | `charge.refunded` | une ligne `remboursement` en négatif dans `paiements` (seulement la part remboursée cette fois-ci). |
 | `charge.dispute.created` | une ligne `litige` en négatif dans `paiements`, et la date limite pour envoyer les preuves dans le journal. |
 

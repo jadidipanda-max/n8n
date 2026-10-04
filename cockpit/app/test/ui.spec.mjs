@@ -17,9 +17,8 @@ import { fileURLToPath } from 'node:url';
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ICI, '..', 'public');
 const require = createRequire(import.meta.url);
-const { construireCsp } = require('../server.js');
+const { construireCsp, SUPABASE_JS_URL } = require('../server.js');
 const CAPTURES = process.env.UI_CAPTURES || path.join(os.tmpdir(), 'cockpit-ui-captures');
-const SUPABASE_JS_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js';
 const SUPABASE_VERSION = '2.45.4';
 const FAUX = 'https://faux-projet.supabase.co';
 const CLE = 'sb_publishable_test_cockpit';
@@ -265,6 +264,19 @@ async function attendreCash(page, attendu) {
     return !!el && el.textContent.replace(/[\s  ]/g, '') === v;
   }, attendu, { timeout: 8000 });
 }
+// Attend que l'interface ait placé le curseur dans le champ, puis remplit (évite toute course
+// entre le placement du curseur et la saisie de Playwright).
+async function attendreCurseur(page, sel) {
+  await page.waitForFunction(id => document.activeElement && document.activeElement.id === id, sel.slice(1), { timeout: 8000 });
+}
+async function remplirConnexion(page, email, mdp) {
+  await page.waitForSelector('#loginForm:not([hidden])');
+  await attendreCurseur(page, '#loginEmail');
+  await page.fill('#loginEmail', email);
+  await page.fill('#loginPassword', mdp);
+  assert.equal(await page.inputValue('#loginEmail'), email, 'e-mail saisi dans le bon champ');
+  assert.equal(await page.inputValue('#loginPassword'), mdp, 'mot de passe saisi dans le bon champ');
+}
 async function attendreApp(page) {
   await page.waitForSelector('#app:not([hidden])', { timeout: 15000 });
   await page.waitForFunction(() => document.querySelectorAll('#plan .room').length === 8 && !!document.querySelector('#core'));
@@ -387,8 +399,7 @@ test('Supabase : connexion, montants des vues, décision, temps réel, Hermès, 
     // erreurs claires en français
     await page.click('#loginSubmit');
     assert.match(await texte(page, '#loginError'), /Indique ton adresse e-mail/);
-    await page.fill('#loginEmail', 'jay@exemple.fr');
-    await page.fill('#loginPassword', 'mauvais');
+    await remplirConnexion(page, 'jay@exemple.fr', 'mauvais');
     await page.click('#loginSubmit');
     await page.waitForFunction(() => /incorrect/.test(document.querySelector('#loginError').textContent));
     assert.match(await texte(page, '#loginError'), /E-mail ou mot de passe incorrect/);
@@ -485,6 +496,7 @@ test('Supabase : connexion, montants des vues, décision, temps réel, Hermès, 
 
     // mot de passe oublié
     await page.click('#forgotLink');
+    await attendreCurseur(page, '#forgotEmail');
     await page.fill('#forgotEmail', 'jay@exemple.fr');
     await page.click('#forgotSubmit');
     await page.waitForSelector('#forgotOk:not([hidden])');
@@ -505,8 +517,7 @@ test('Supabase : Junior (associé) arrive à la station USA et ne change pas l�
   const fx = await brancherFauxSupabase(page, d, { id: JUNIOR, email: 'junior@exemple.com' });
   try {
     await page.goto(serveur.base + '/');
-    await page.fill('#loginEmail', 'junior@exemple.com');
-    await page.fill('#loginPassword', 'bon-mot-de-passe');
+    await remplirConnexion(page, 'junior@exemple.com', 'bon-mot-de-passe');
     await page.click('#loginSubmit');
     await attendreApp(page);
     assert.equal(await page.getAttribute('#tab-us', 'aria-selected'), 'true', 'Junior arrive à la station USA');
@@ -535,8 +546,7 @@ test('Supabase : base vide → 0 € et explication, sans fausses données', asy
   await brancherFauxSupabase(page, donneesVides());
   try {
     await page.goto(serveur.base + '/');
-    await page.fill('#loginEmail', 'jay@exemple.fr');
-    await page.fill('#loginPassword', 'bon-mot-de-passe');
+    await remplirConnexion(page, 'jay@exemple.fr', 'bon-mot-de-passe');
     await page.click('#loginSubmit');
     await attendreApp(page);
     await attendreCash(page, '0€');
@@ -566,6 +576,7 @@ test('Supabase : lien « mot de passe oublié » → nouveau mot de passe, puis 
     const exp = Math.floor(Date.now() / 1000) + 3600;
     await page.goto(`${serveur.base}/#access_token=${fx.jeton}&expires_at=${exp}&expires_in=3600&refresh_token=rafraichir-test&token_type=bearer&type=recovery`);
     await page.waitForSelector('#recoverForm:not([hidden])');
+    await attendreCurseur(page, '#newPassword');
     await page.fill('#newPassword', 'nouveau-mdp-2026');
     await page.fill('#newPassword2', 'autre-chose-2026');
     await page.click('#recoverSubmit');
@@ -590,8 +601,7 @@ test('Supabase : compte sans profil → message clair et déconnexion possible',
   const fx = await brancherFauxSupabase(page, d);
   try {
     await page.goto(serveur.base + '/');
-    await page.fill('#loginEmail', 'jay@exemple.fr');
-    await page.fill('#loginPassword', 'bon-mot-de-passe');
+    await remplirConnexion(page, 'jay@exemple.fr', 'bon-mot-de-passe');
     await page.click('#loginSubmit');
     await page.waitForSelector('#fatal:not([hidden])');
     assert.match(await texte(page, '#fatalTitle'), /pas encore accès/);
@@ -599,5 +609,57 @@ test('Supabase : compte sans profil → message clair et déconnexion possible',
     await page.click('#fatalLogout');
     await page.waitForSelector('#loginForm:not([hidden])');
     assert.deepEqual(soucis, []);
+  } finally { await ctx.close(); }
+});
+
+/* =====================================================================
+   Régressions : curseur de connexion et CSP
+   ===================================================================== */
+test('connexion : le curseur ne quitte pas le mot de passe pendant la saisie (pas de course)', async t => {
+  if (sansSupabase()) return t.skip(sansSupabase());
+  serveur.etat.config = { supabaseUrl: FAUX, supabasePublishableKey: CLE, hermes: true, demo: false };
+  const { ctx, page } = await nouvellePage({ mouvement: 'reduce' });
+  await brancherFauxSupabase(page, donneesPleines());
+  try {
+    // horloge figée : les minuteurs de l'interface ne tournent que quand on avance l'horloge
+    await page.clock.install({ time: new Date('2026-10-04T10:00:00+02:00') });
+    await page.clock.pauseAt(new Date('2026-10-04T10:00:01+02:00'));
+    await page.goto(serveur.base + '/');
+    await page.waitForSelector('#loginForm:not([hidden])');
+    assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.id), 'loginEmail', 'curseur placé tout de suite');
+    await page.fill('#loginEmail', 'junior@exemple.com');
+    await page.focus('#loginPassword');
+    await page.keyboard.type('bon-');
+    await page.clock.runFor(1000); // le minuteur de placement du curseur passe pendant la saisie
+    await page.keyboard.type('mot-de-passe');
+    assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.id), 'loginPassword');
+    assert.equal(await page.inputValue('#loginEmail'), 'junior@exemple.com');
+    assert.equal(await page.inputValue('#loginPassword'), 'bon-mot-de-passe');
+  } finally { await ctx.close(); }
+});
+
+test('CSP : un script d’un autre chemin de jsDelivr est bloqué par le navigateur', async t => {
+  if (sansPlaywright()) return t.skip(sansPlaywright());
+  serveur.etat.config = { supabaseUrl: null, supabasePublishableKey: null, hermes: false, demo: true };
+  const { ctx, page } = await nouvellePage({ mouvement: 'reduce' });
+  const servis = [];
+  // si le navigateur laissait passer, ce faux « code tiers » s'exécuterait
+  await page.route('https://cdn.jsdelivr.net/gh/**', r => { servis.push(r.request().url()); return r.fulfill({ status: 200, headers: { 'content-type': 'text/javascript', 'access-control-allow-origin': '*' }, body: 'window.__tiers = "code tiers exécuté";' }); });
+  try {
+    await page.goto(serveur.base + '/?demo#qg');
+    await page.waitForSelector('#app:not([hidden])', { timeout: 15000 });
+    const resultat = await page.evaluate(() => new Promise(resolve => {
+      const violations = [];
+      document.addEventListener('securitypolicyviolation', e => violations.push(e.blockedURI));
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/gh/attaquant/outil@1/x.js';
+      s.onload = () => resolve({ etat: 'chargé', tiers: window.__tiers || null, violations });
+      s.onerror = () => setTimeout(() => resolve({ etat: 'bloqué', tiers: window.__tiers || null, violations }), 50);
+      document.head.appendChild(s);
+    }));
+    assert.equal(resultat.etat, 'bloqué');
+    assert.equal(resultat.tiers, null);
+    assert.ok(resultat.violations.some(u => u.startsWith('https://cdn.jsdelivr.net/gh/')), JSON.stringify(resultat.violations));
+    assert.deepEqual(servis, [], 'aucune requête n’est partie vers le chemin interdit');
   } finally { await ctx.close(); }
 });

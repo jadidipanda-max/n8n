@@ -155,6 +155,48 @@ select tests.echoue('Junior ne change pas un niveau d''autonomie',
 select tests.egal('l''action FR est toujours en attente',
   (select statut from public.actions where id = 'a1000000-0000-4000-8000-000000000001'), 'en_attente');
 
+-- messages forgés en passant à côté du serveur (PostgREST direct)
+select tests.echoue('Junior n''écrit pas un message de type rapport',
+  $$insert into public.messages (auteur, auteur_id, type, contenu) values ('junior', '22222222-2222-4222-8222-222222222222', 'rapport', 'faux rapport')$$, '42501');
+select tests.echoue('Junior n''écrit pas une alerte',
+  $$insert into public.messages (auteur, type, contenu) values ('junior', 'alerte', 'fausse alerte')$$, '42501');
+select tests.echoue('Junior ne met pas de meta dans son message',
+  $$insert into public.messages (auteur, contenu, meta) values ('junior', 'x', '{"rapport": "2026-10-03"}')$$, '42501');
+begin;
+insert into public.messages (auteur, contenu, cree_le) values ('junior', 'Je reste en tête', '2099-01-01');
+select tests.ok('date du message posée par la base (pas en 2099)',
+  (select cree_le < now() + interval '1 minute' from public.messages where contenu = 'Je reste en tête'));
+select tests.ok('… et le message n''est pas « plus récent » que les suivants',
+  (select cree_le <= now() from public.messages where contenu = 'Je reste en tête'));
+rollback;
+:en_junior
+select tests.echoue('Junior n''inonde pas la messagerie (5000 messages d''un coup)',
+  $$insert into public.messages (auteur, contenu) select 'junior', 'spam ' || i from generate_series(1, 5000) as i$$, 'P0001');
+begin;
+select tests.egal('30 messages dans la minute passent',
+  tests.nb($$insert into public.messages (auteur, contenu) select 'junior', 'm ' || i from generate_series(1, 30) as i$$), 30::bigint);
+select tests.echoue('… le 31e est refusé',
+  $$insert into public.messages (auteur, contenu) values ('junior', 'un de trop')$$, 'P0001');
+rollback;
+:en_junior
+
+-- clients et appels : seulement sur son marché ; Stripe relié par l'admin seulement
+select tests.echoue('Junior ne crée pas de client France',
+  $$insert into public.clients (marche, nom, devise) values ('fr', 'Client fantôme', 'EUR')$$, '42501');
+select tests.echoue('Junior ne réclame pas un client Stripe (stripe_customer_id)',
+  $$insert into public.clients (marche, nom, devise, stripe_customer_id) values ('us', 'Client Stripe', 'USD', 'cus_futur_client')$$, '42501');
+select tests.echoue('Junior ne change pas le stripe_customer_id de son client',
+  $$update public.clients set stripe_customer_id = 'cus_autre' where nom = 'Glow Aesthetics'$$, '42501');
+select tests.echoue('Junior ne passe pas son client sur le marché France',
+  $$update public.clients set marche = 'fr', devise = 'EUR' where nom = 'Glow Aesthetics'$$, '42501');
+select tests.echoue('Junior ne crée pas d''appel France',
+  $$insert into public.appels (marche, ecran, lead_ref) values ('fr', 'standard', 'pirate-001')$$, '42501');
+begin;
+select tests.egal('Junior crée un appel USA',
+  tests.nb($$insert into public.appels (marche, ecran, lead_ref, statut) values ('us', 'us_floride', 'fl-900', 'a_appeler')$$), 1::bigint);
+rollback;
+:en_junior
+
 -- ---------------------------------------------------------------------
 -- Jay (admin)
 -- ---------------------------------------------------------------------
@@ -184,6 +226,15 @@ select tests.egal('Jay écrit un message signé jay',
   tests.nb($$insert into public.messages (auteur, auteur_id, contenu) values ('jay', '11111111-1111-4111-8111-111111111111', 'Go')$$), 1::bigint);
 rollback;
 :en_jay
+begin;
+select tests.egal('Jay relie une fiche client à Stripe',
+  tests.nb($$update public.clients set stripe_customer_id = 'cus_demo_glow_2' where nom = 'Glow Aesthetics'$$), 1::bigint);
+select tests.egal('Jay crée un client USA',
+  tests.nb($$insert into public.clients (marche, nom, devise, stripe_customer_id) values ('us', 'Lone Star Spa', 'USD', 'cus_lone_star')$$), 1::bigint);
+select tests.echoue('appels : marché inconnu refusé (même pour Jay)',
+  $$insert into public.appels (marche, ecran, lead_ref) values ('de', 'standard', 'de-001')$$, '23514');
+rollback;
+:en_jay
 select tests.echoue('Jay n''écrit pas un message signé junior',
   $$insert into public.messages (auteur, auteur_id, contenu) values ('junior', '11111111-1111-4111-8111-111111111111', 'x')$$, '42501');
 select tests.echoue('Jay n''écrit pas un message signé hermes',
@@ -211,5 +262,45 @@ select tests.passe('service_role crée une action',
 select tests.passe('service_role met à jour agents_etat',
   $$update public.agents_etat set statut = 'ok' where agent = 'reporter'$$);
 select tests.ok('service_role lit les vues de cash', tests.compte('v_cash_resume') = 3);
+rollback;
+:en_postgres
+
+-- ---------------------------------------------------------------------
+-- Fiches clients et paiements Stripe : reliés dans les deux sens
+-- ---------------------------------------------------------------------
+begin;
+:en_service
+-- 1er paiement d'un client qui n'a pas encore de fiche
+insert into public.paiements (stripe_event_id, stripe_customer_id, marche, type, montant, devise, paye_le)
+values ('evt_nouveau_client', 'cus_nouveau', 'fr', 'abonnement', 390, 'EUR', now());
+insert into public.abonnements (stripe_subscription_id, stripe_customer_id, marche, statut, montant, devise)
+values ('sub_nouveau', 'cus_nouveau', 'fr', 'active', 390, 'EUR');
+:en_postgres
+select tests.egal('paiement sans fiche : client_id vide',
+  (select client_id from public.paiements where stripe_event_id = 'evt_nouveau_client'), null::uuid);
+:en_jay
+insert into public.clients (marche, nom, devise, stripe_customer_id, debut)
+values ('fr', 'Spa Lumen', 'EUR', 'cus_nouveau', current_date);
+:en_postgres
+select tests.ok('fiche ajoutée après coup : le paiement est rattaché',
+  (select p.client_id = c.id from public.paiements p, public.clients c
+    where p.stripe_event_id = 'evt_nouveau_client' and c.stripe_customer_id = 'cus_nouveau'));
+select tests.ok('… et l''abonnement aussi',
+  (select a.client_id = c.id from public.abonnements a, public.clients c
+    where a.stripe_subscription_id = 'sub_nouveau' and c.stripe_customer_id = 'cus_nouveau'));
+-- fiche créée par n8n (clé secrète, sans propriétaire) : elle va à l'associé du marché
+:en_service
+insert into public.clients (marche, nom, devise, stripe_customer_id) values ('us', 'Radiance MedSpa', 'USD', 'cus_radiance')
+on conflict (stripe_customer_id) do nothing;
+insert into public.clients (marche, nom, devise, stripe_customer_id) values ('us', 'Nom écrasé ?', 'USD', 'cus_radiance')
+on conflict (stripe_customer_id) do nothing;
+:en_postgres
+select tests.egal('fiche créée par n8n sur les USA : propriétaire = Junior',
+  (select owner_id from public.clients where stripe_customer_id = 'cus_radiance'), '22222222-2222-4222-8222-222222222222'::uuid);
+select tests.egal('… et n8n n''écrase pas une fiche existante',
+  (select nom from public.clients where stripe_customer_id = 'cus_radiance'), 'Radiance MedSpa');
+:en_junior
+select tests.egal('Junior complète la fiche créée par n8n',
+  tests.nb($$update public.clients set niche = 'Med spa · Orlando, FL' where stripe_customer_id = 'cus_radiance'$$), 1::bigint);
 rollback;
 :en_postgres

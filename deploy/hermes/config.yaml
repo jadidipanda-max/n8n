@@ -1,0 +1,87 @@
+# Exemple de configuration Hermès (Hermes Agent, Nous Research) pour le « centre » J-Square.
+# À fusionner dans ~/.hermes/config.yaml du compte « hermes » : scripts/installer-hermes.sh
+# le fait pour toi. Les secrets ne vont jamais ici : ils vont dans ~/.hermes/.env (voir env.example).
+#
+# Chaque clé ci-dessous a été vérifiée dans la doc officielle hermes-agent.nousresearch.com/docs
+# (version du 4 octobre 2026) :
+#   model.provider, model.default -> Integrations > AI Providers > Anthropic (Native)
+#   timezone                      -> User Guide > Configuration > Timezone
+#   approvals.*                   -> User Guide > Security > Dangerous Command Approval, Deny rules
+#   gateway.api_server.*          -> User Guide > Features > API Server > Configuration
+#   mcp_servers.*                 -> Reference > MCP Config Reference (url, headers, timeout,
+#                                    connect_timeout, références ${VAR} lues dans ~/.hermes/.env)
+# L'adresse et la clé de l'API (127.0.0.1:8642) se règlent dans ~/.hermes/.env : API_SERVER_*.
+
+# Modèle : clé API Anthropic payée à l'usage (ANTHROPIC_API_KEY dans .env), avec un plafond
+# de dépense posé sur console.anthropic.com. Pour changer de modèle : « hermes model ».
+# claude-opus-5-5 = le modèle Claude recommandé par défaut au 4 octobre 2026 ;
+# claude-sonnet-5-5 coûte deux fois moins cher si le budget serre.
+model:
+  provider: "anthropic"
+  default: "claude-opus-5-5"
+
+# Heure de Paris pour l'agent (heure donnée au modèle, tâches planifiées).
+timezone: "Europe/Paris"
+
+gateway:
+  api_server:
+    max_concurrent_runs: 4 # au-delà, l'API refuse (le cockpit dit de réessayer)
+
+# Outils d'Hermès. Le compte « hermes » garde dans ~/.hermes/.env la clé Claude, la clé de l'API
+# et le jeton Supabase (sbp_…, qui ouvre tout le compte Supabase, pas seulement la lecture).
+# Un agent qui a un terminal ou l'accès aux fichiers pourrait lire ce fichier : il suffirait d'un
+# message piégé (messagerie, nom de client, description Stripe lus la nuit). Donc :
+#  - l'API (cockpit et n8n) n'a que la base en lecture seule (MCP Supabase) et sa mémoire :
+#    ni terminal, ni fichiers, ni exécution de code, ni web, ni navigateur, ni sous-agents ;
+#  - ces outils sont aussi coupés pour tous les autres canaux (agent.disabled_toolsets).
+# Clés vérifiées dans le code d'hermes-agent (gateway/platforms/api_server.py : les outils de
+# l'API viennent de platform_toolsets.api_server ; gateway/run_turn.py : agent.disabled_toolsets)
+# et dans la doc (Reference > Toolsets Reference). installer-hermes.sh vérifie le résultat
+# avec GET /v1/toolsets et s'arrête si un outil dangereux reste actif.
+platform_toolsets:
+  api_server: [mcp-supabase, memory, todo, session_search]
+  cron: [mcp-supabase, memory, todo, session_search]
+
+agent:
+  disabled_toolsets: [terminal, file, code_execution, web, search, browser, delegation, cronjob, computer_use, image_gen, skills, connections]
+
+# Si un jour un terminal revient (mauvaise manipulation), les commandes d'administration
+# et de lecture des secrets restent bloquées. Ce n'est qu'un filet : la vraie protection,
+# c'est l'absence de terminal ci-dessus.
+approvals:
+  mode: smart
+  unattended_mode: deny
+  cron_mode: deny
+  deny:
+    - 'sudo *'
+    - 'su *'
+    - 'docker *'
+    - 'ufw *'
+    - 'iptables *'
+    - 'systemctl *'
+    - 'crontab *'
+    - 'shutdown *'
+    - 'reboot*'
+    - '*.env*'
+    - '*printenv*'
+    - 'env'
+    - 'env *'
+    - 'set'
+    - 'curl *'
+    - 'wget *'
+    - '*hermes/.env*'
+    - '*config.yaml*'
+
+# Supabase en lecture seule, limité au projet J-Square (MCP hébergé par Supabase).
+# Paramètres d'URL vérifiés sur supabase.com/docs/guides/getting-started/mcp :
+#   project_ref = un seul projet ; read_only=true = requêtes en lecture seule ;
+#   features=database,docs = seulement les outils base de données et documentation.
+# Jeton personnel Supabase (SUPABASE_ACCESS_TOKEN) et référence du projet (SUPABASE_PROJECT_REF)
+# lus dans ~/.hermes/.env. Si l'un manque, Hermès refuse de se connecter (pas d'erreur 401 cachée).
+mcp_servers:
+  supabase:
+    url: "https://mcp.supabase.com/mcp?project_ref=${SUPABASE_PROJECT_REF}&read_only=true&features=database,docs"
+    headers:
+      Authorization: "Bearer ${SUPABASE_ACCESS_TOKEN}"
+    timeout: 120
+    connect_timeout: 60

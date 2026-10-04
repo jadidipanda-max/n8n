@@ -47,12 +47,12 @@ Deux associés seulement. Toute personne connectée sans ligne dans `profils` ne
 | Table | Colonnes (en plus de `id uuid pk default gen_random_uuid()` sauf mention) | Écrit par |
 |---|---|---|
 | `reglages` | `cle text pk` (pas d'id), `valeur jsonb not null`, `maj timestamptz default now()` | admin |
-| `clients` | `marche text not null check in ('fr','us')`, `nom text not null`, `niche text`, `palier text`, `prix_mensuel numeric(12,2)`, `devise text not null check in ('EUR','USD')`, `mise_en_place numeric(12,2) default 0`, `debut date`, `fin_engagement date`, `objectif_garantie text`, `objectif_valeur numeric`, `resultat_valeur numeric default 0`, `prochain_point timestamptz`, `point_booke boolean default false`, `stripe_customer_id text unique`, `statut text default 'actif' check in ('actif','pause','termine')`, `owner_id uuid references profils(id) default auth.uid()`, `cree_le`, `maj` | associé (ses lignes) ou admin ; n8n |
+| `clients` | `marche text not null check in ('fr','us')`, `nom text not null`, `niche text`, `palier text`, `prix_mensuel numeric(12,2)`, `devise text not null check in ('EUR','USD')`, `mise_en_place numeric(12,2) default 0`, `debut date`, `fin_engagement date`, `objectif_garantie text`, `objectif_valeur numeric`, `resultat_valeur numeric default 0`, `prochain_point timestamptz`, `point_booke boolean default false`, `stripe_customer_id text unique`, `statut text default 'actif' check in ('actif','pause','termine')`, `owner_id uuid references profils(id) default auth.uid()`, `cree_le`, `maj` | associé (ses lignes, sur son marché) ou admin ; n8n crée la fiche d'un client abonné (`on_conflict=stripe_customer_id`, jamais écrasée). `stripe_customer_id` : posé ou changé seulement par l'admin ou n8n |
 | `abonnements` | `stripe_subscription_id text unique not null`, `stripe_customer_id text`, `client_id uuid references clients(id)`, `marche text check in ('fr','us')`, `statut text not null` (statut Stripe : active, trialing, past_due, canceled, unpaid, incomplete…), `montant numeric(12,2) not null` (montant par facture), `devise text not null`, `intervalle_mois int not null default 1` (3 pour un pack trimestriel), `debut timestamptz`, `fin_engagement timestamptz`, `prochaine_facture timestamptz`, `annule_le timestamptz`, `maj timestamptz default now()` | n8n seulement |
 | `paiements` | `stripe_event_id text unique not null`, `stripe_invoice_id text`, `stripe_customer_id text`, `client_id uuid references clients(id)`, `marche text not null check in ('fr','us')`, `type text not null check in ('abonnement','mise_en_place','pack','ponctuel','remboursement','litige')`, `montant numeric(12,2) not null` (négatif pour un remboursement ou un litige), `devise text not null check in ('EUR','USD')`, `taux_eur numeric(12,6) not null default 1` (euros pour 1 unité de devise), `montant_eur numeric(12,2) generated always as (round(montant * taux_eur, 2)) stored`, `paye_le timestamptz not null`, `description text`, `cree_le timestamptz default now()` | n8n seulement |
 | `objectifs` | `mois date not null` (1ᵉʳ du mois), `marche text not null check in ('fr','us')`, `clients_vises int not null`, `cash_vise numeric(12,2) not null`, `devise text not null`, `calcule_par text`, `maj`, contrainte unique `(mois, marche)` | admin ; agent finance via n8n |
 | `couts` | `mois date not null`, `poste text not null`, `montant_eur numeric(12,2) not null`, unique `(mois, poste)` | admin ; n8n |
-| `appels` | `marche text not null`, `ecran text not null` (ex. `standard`, `acquisition`, `us_floride`), `lead_ref text not null`, `statut text`, `note text`, `rappel_le timestamptz`, `maj timestamptz`, `owner_id uuid references profils(id)`, unique `(ecran, lead_ref)` | n8n (synchro du soir) ; associé (ses lignes) |
+| `appels` | `marche text not null check in ('fr','us')`, `ecran text not null` (ex. `standard`, `acquisition`, `us_floride`), `lead_ref text not null`, `statut text`, `note text`, `rappel_le timestamptz`, `maj timestamptz`, `owner_id uuid references profils(id)`, unique `(ecran, lead_ref)` | n8n (synchro du soir) ; associé (ses lignes, sur son marché) |
 | `actions` | `marche text check in ('fr','us')` (null = les deux), `agent text not null`, `type_action text not null`, `titre text not null`, `details jsonb default '{}'`, `statut text not null default 'en_attente' check in ('en_attente','validee','refusee','executee','erreur')`, `auto boolean default false` (exécutée sans validation grâce à l'autonomie), `cree_le`, `decide_par uuid references profils(id)`, `decide_le timestamptz`, `correction text` | n8n et Hermès créent ; décision seulement par `decider_action` |
 | `autonomie` | pk `(agent, type_action)` (pas d'id), `niveau int not null default 0 check (niveau between 0 and 2)` (0 = toujours demander, 1 = autonome après 5 OK, 2 = autonome), `verrou boolean not null default false` (argent, prix, contrat, premier message à un client : niveau 0 obligatoire), `ok_consecutifs int not null default 0`, `maj` | seulement par `changer_autonomie` et par le trigger de `actions` |
 | `messages` | `auteur text not null check in ('jay','junior','hermes','systeme')`, `auteur_id uuid references profils(id)`, `marche text check in ('fr','us')`, `type text not null default 'message' check in ('message','rapport','alerte')`, `contenu text not null check (char_length(contenu) <= 8000)`, `meta jsonb default '{}'`, `cree_le timestamptz default now()` | associé (ses messages) ; serveur et n8n (Hermès, système) |
@@ -60,7 +60,13 @@ Deux associés seulement. Toute personne connectée sans ligne dans `profils` ne
 | `agents_etat` | `agent text pk` (pas d'id), `nom text not null`, `marche text`, `statut text not null check in ('run','wait','idle','ok','err')`, `derniere_phrase text`, `derniere_execution timestamptz`, `prochaine_execution timestamptz`, `cout_jour_eur numeric(10,2) default 0`, `maj` | n8n et Hermès |
 | `journal` | `marche text` (null = les deux), `agent text not null`, `texte text not null`, `cree_le timestamptz default now()` | n8n, Hermès, triggers |
 
-Index : `paiements(paye_le)`, `paiements(marche, paye_le)`, `journal(cree_le desc)`, `messages(cree_le desc)`, `actions(statut, cree_le)`.
+Index : `paiements(paye_le)`, `paiements(marche, paye_le)`, `journal(cree_le desc)`, `messages(cree_le desc)`, `messages(auteur_id, cree_le desc)`, `actions(statut, cree_le)`.
+
+Triggers de liaison et de garde (en plus de `maj`) :
+- `relier_client` (avant insert/update sur `paiements` et `abonnements`) : remplit `client_id` d'après `stripe_customer_id`.
+- `rattacher_historique_client` (après insert, ou update de `stripe_customer_id`, sur `clients`) : rattache à la fiche les paiements et abonnements déjà reçus pour ce `stripe_customer_id` et encore sans `client_id`.
+- `clients_avant_ecriture` : refuse (42501) qu'une personne non admin pose ou change `stripe_customer_id` ; une fiche insérée sans `owner_id` (n8n) reçoit l'associé dont `profils.marche` = `clients.marche`.
+- `messages_avant_ajout` : pour un message de `jay` ou `junior` écrit par une personne connectée, `cree_le := now()` et au plus 30 messages par minute et par `auteur_id` (au-delà : erreur P0001).
 
 ### 1.3 Valeurs de `reglages` (insérées par la migration)
 
@@ -80,8 +86,8 @@ Index : `paiements(paye_le)`, `paiements(marche, paye_le)`, `journal(cree_le des
 
 - **Lecture (SELECT)** sur toutes les tables et vues : `using (est_membre())`.
 - **Écriture par une personne connectée** :
-  - `clients`, `appels` : INSERT/UPDATE/DELETE avec `est_admin() or owner_id = auth.uid()` (`with check` identique).
-  - `messages` : INSERT seulement si `auteur_id = auth.uid()` et que `auteur` vaut `'jay'` pour l'admin ou `'junior'` pour l'associé. Pas d'UPDATE ni de DELETE.
+  - `clients`, `appels` : INSERT/UPDATE/DELETE avec `est_admin() or (owner_id = auth.uid() and marche = mon_marche())` (`with check` identique).
+  - `messages` : INSERT seulement si `auteur_id = auth.uid()`, que `auteur` vaut `'jay'` pour l'admin ou `'junior'` pour l'associé, que `type = 'message'` et que `meta` est vide (`{}`). Pas d'UPDATE ni de DELETE. La date et le débit sont gardés par le trigger `messages_avant_ajout`.
   - `reglages`, `objectifs`, `couts` : INSERT/UPDATE si `est_admin()`.
   - Toutes les autres tables (`paiements`, `abonnements`, `actions`, `autonomie`, `rapports`, `agents_etat`, `journal`, `profils`) : aucune politique d'écriture. Seule la clé secrète (n8n, serveur) ou une fonction `security definer` y écrit.
 - **Vues** : `with (security_invoker = true)`.
@@ -95,12 +101,14 @@ Index : `paiements(paye_le)`, `paiements(marche, paye_le)`, `journal(cree_le des
   - Refuse si la personne n'est ni admin ni du marché de l'action (une action sans marché demande l'admin).
   - Met `statut` à `validee` ou `refusee`, avec `decide_par`, `decide_le` et `correction`.
   - Met à jour `autonomie`, en créant la ligne si besoin (niveau 0) :
-    - validée sans correction : `ok_consecutifs + 1` ;
-    - refusée ou corrigée : `ok_consecutifs = 0`, et `niveau = greatest(niveau - 1, 0)`.
+    - validée sans correction **par l'admin** : `ok_consecutifs + 1` (l'autonomie est commune aux deux marchés : un OK de l'associé ne la fait pas monter, sinon les OK de Junior sur les USA rendraient autonomes les actions France) ;
+    - validée sans correction par l'associé : compteur inchangé ;
+    - refusée ou corrigée (par n'importe qui) : `ok_consecutifs = 0`, et `niveau = greatest(niveau - 1, 0)`.
   - Écrit une ligne dans `journal`.
+- **`type_action_verrouille(p_type text) returns boolean`** : vrai pour les actions toujours soumises à validation. Le type est normalisé (minuscules, sans accents, séparateur `_`), puis comparé à la liste `relance_impaye`, `changer_prix`, `envoyer_argent`, `rembourser`, `mission_apify`, `envoyer_contrat`, `signer_contrat`, `premier_message`, et à des familles de mots : `rembours…`, `payer`, `paiement`, `virement`, `argent`, `impaye`, `litige`, `contrat`, `apify`, `premier_message`, ou un verbe de changement (`changer`, `modifier`, `baisser`, `monter`, `augmenter`, `reduire`, `fixer`, `appliquer`) suivi de `prix`, `tarif` ou `remise`.
 - **`changer_autonomie(p_agent text, p_type text, p_niveau int) returns autonomie`**
   - Admin seulement.
-  - Refuse un niveau supérieur à 0 si `verrou`.
+  - Refuse un niveau supérieur à 0 si `verrou` ou si `type_action_verrouille(p_type)` (la ligne est alors verrouillée).
   - Remet `ok_consecutifs` à 0.
 - **`promotion_possible` (vue)** : lignes d'`autonomie` où `verrou = false`, `niveau < 2` et `ok_consecutifs >= 5`. Hermès les propose, Jay décide.
 
@@ -130,7 +138,7 @@ Index : `paiements(paye_le)`, `paiements(marche, paye_le)`, `journal(cree_le des
 
 ## 2. Serveur du cockpit (`cockpit/app/server.js`)
 
-Node 22, aucune dépendance npm. Il écoute sur `PORT` (défaut 8080) et sert `public/`. En-têtes de sécurité : CSP stricte (scripts : self et cdn.jsdelivr.net ; connexions : self et `SUPABASE_URL` en https/wss ; polices : Google Fonts), `X-Frame-Options: DENY` et `Referrer-Policy: same-origin`.
+Node 22, aucune dépendance npm. Il écoute sur `PORT` (défaut 8080) et sert `public/`. En-têtes de sécurité : CSP stricte (scripts : self et **le seul fichier** supabase-js figé de la section 3, pas tout cdn.jsdelivr.net ; connexions : self et `SUPABASE_URL` en https/wss ; polices : Google Fonts), `X-Frame-Options: DENY` et `Referrer-Policy: same-origin`.
 
 ### Variables d'environnement
 
@@ -151,14 +159,15 @@ Node 22, aucune dépendance npm. Il écoute sur `PORT` (défaut 8080) et sert `p
 - **`GET /healthz`** → `{ "ok": true }`.
 - **`POST /api/hermes/chat`**
   - En-tête `Authorization: Bearer <access_token Supabase>`. Corps : `{ "message": string (1 à 4000 caractères), "marche": "fr"|"us"|null }`.
+  0. Avant toute vérification : au plus 30 demandes par minute et par adresse IP (derrière Caddy, la dernière entrée de `X-Forwarded-For`), et 120 vérifications de jeton par minute pour tout le serveur ; au-delà, 429.
   1. Vérifie le jeton avec `GET {SUPABASE_URL}/auth/v1/user` (apikey = clé publishable) : 401 si le jeton est invalide.
   2. Lit le profil avec le jeton de la personne (`GET /rest/v1/profils?id=eq.<uid>`) : 403 s'il n'y a pas de profil.
   3. Insère le message de la personne dans `messages` avec son propre jeton, donc sous RLS (`auteur` = `jay` si admin, sinon `junior`).
   4. Lit les 20 derniers messages.
-  5. Appelle `POST {HERMES_URL}/v1/chat/completions` (OpenAI-compatible, `Authorization: Bearer HERMES_API_KEY`, `model: HERMES_MODEL`). Le message système rappelle qui parle, son marché, et qu'aucune action réelle ne part sans passer par la table `actions`.
+  5. Appelle `POST {HERMES_URL}/v1/chat/completions` (OpenAI-compatible, `Authorization: Bearer HERMES_API_KEY`, `model: HERMES_MODEL`). Le message système rappelle qui parle, son marché, et qu'aucune action réelle ne part sans passer par la table `actions`. Chaque message de Jay ou Junior (historique et message en cours) part encadré : `<message auteur="jay|junior">texte</message>`, avec `&`, `<` et `>` échappés dans le texte ; le message système dit que seul l'attribut `auteur` indique qui parle.
   6. Insère la réponse (`auteur` = `hermes`) avec la clé secrète.
   7. Répond `{ "reply": string, "messageId": uuid }`.
-  - Erreurs : 401 jeton invalide, 403 sans profil, 400 corps invalide, 429 au-delà de 20 messages par minute et par personne, 502 si Hermès ne répond pas (le message de la personne reste enregistré, la réponse indique « Hermès ne répond pas, réessaie dans un instant »), 503 si `HERMES_API_KEY` est absente.
+  - Erreurs : 401 jeton invalide, 403 sans profil, 400 corps invalide, 429 au-delà de 20 messages par minute et par personne (ou des limites de l'étape 0), 502 si Hermès ne répond pas (le message de la personne reste enregistré, la réponse indique « Hermès ne répond pas, réessaie dans un instant »), 503 si `HERMES_API_KEY` est absente.
   - Le jeton et la clé ne sont jamais écrits dans les logs.
 
 ## 3. Interface (`cockpit/app/public/`)
@@ -187,11 +196,13 @@ Node 22, aucune dépendance npm. Il écoute sur `PORT` (défaut 8080) et sert `p
     - le marché vient des `metadata.marche` du client Stripe, ou à défaut de la devise (USD donne us) ;
     - les montants passent des centimes Stripe aux unités.
   - Puis HTTP Request vers `POST {SUPABASE_URL}/rest/v1/paiements?on_conflict=stripe_event_id` avec `Prefer: resolution=ignore-duplicates`, et `abonnements` en upsert sur `stripe_subscription_id`.
+  - Fiche client : pour `invoice.paid` d'un abonnement, et pour `customer.subscription.created` actif ou en essai, la sortie `clients` contient une ligne (`stripe_customer_id`, `marche`, `nom`, `devise`, `prix_mensuel`, `debut`, `fin_engagement`), écrite **avant** les paiements par `POST /rest/v1/clients?on_conflict=stripe_customer_id` avec `Prefer: resolution=ignore-duplicates` (une fiche existante n'est jamais écrasée).
   - Une ligne est ajoutée dans `journal`.
   - `invoice.payment_failed` crée une `actions` (type `relance_impaye`, verrouillée), et rien d'autre.
 - **`rapport-du-soir`** :
   - Schedule à 23:00 (fuseau Europe/Paris dans les réglages du workflow).
-  - HTTP Request vers l'API Hermès (`/v1/chat/completions`). Le prompt demande la synthèse du jour, Hermès lisant Supabase en lecture seule via MCP. Il doit répondre en JSON `{ verdict, resume, contenu }`.
+  - HTTP Request vers l'API Hermès (`/v1/chat/completions`). Le prompt demande la synthèse du jour, Hermès lisant Supabase en lecture seule via MCP. Il doit répondre en JSON `{ verdict, resume, contenu, donnees }`, où `donnees` contient les clés `appels_fr`, `joints_fr`, `demos_fr`, `appels_us`, `joints_us`, `demos_us`, `demos_total`, `demos_necessaires` (entiers, ou null si inconnu) ; l'interface lit `demos_total` et `demos_necessaires`.
+- **Hors périmètre de ces deux workflows** : `appels`, `objectifs`, `couts`, l'état des agents autres que `reporter`, et les actions autres que `relance_impaye`. Ces tables se remplissent à la main (Table Editor) ou par de futurs workflows ; les salles concernées restent vides ou à zéro jusque-là.
   - Insertion dans `rapports` et dans `messages` (`type = 'rapport'`, `auteur = 'hermes'`).
   - Mise à jour de `agents_etat` pour l'agent `reporter`.
 - **Identifiants n8n** : une clé secrète Supabase réservée à n8n, la clé de l'API Hermès, et le secret de signature Stripe.
@@ -202,9 +213,10 @@ Node 22, aucune dépendance npm. Il écoute sur `PORT` (défaut 8080) et sert `p
   - Volumes persistants pour n8n et Caddy.
   - `extra_hosts: host.docker.internal:host-gateway` pour joindre Hermès.
 - **Hermès** : installé sur l'hôte avec le script officiel. API sur `127.0.0.1:8642` uniquement, avec `API_SERVER_KEY`. MCP Supabase `https://mcp.supabase.com/mcp?project_ref=<ref>&read_only=true`. Fuseau du serveur : Europe/Paris.
+  - Outils : `platform_toolsets.api_server` (et `cron`) = `[mcp-supabase, memory, todo, session_search]` ; `agent.disabled_toolsets` coupe `terminal`, `file`, `code_execution`, `web`, `search`, `browser`, `delegation`, `cronjob`, `computer_use`, `image_gen`, `skills`, `connections`. Le jeton `sbp_…` rangé dans `~/.hermes/.env` ouvre tout le compte Supabase : aucun outil ne doit permettre de lire ce fichier. `installer-hermes.sh` vérifie `GET /v1/toolsets` et arrête le service si un outil dangereux est actif.
 - **Domaines** :
   - `cockpit.<domaine>` vers `cockpit:8080` ;
-  - `n8n.<domaine>` vers `n8n:5678`, protégé par l'authentification de n8n.
+  - `n8n.<domaine>` vers `n8n:5678`, protégé par l'authentification de n8n, avec la double authentification (2FA) activée dès la première connexion.
   - L'API Hermès n'est jamais exposée.
 - **Pare-feu** : seuls 22, 80 et 443 sont ouverts.
 - **Guide** (`deploy/README.md`), pas à pas en français pour quelqu'un qui n'est pas développeur :
