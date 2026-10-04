@@ -104,9 +104,9 @@ La simulation est sur 12 mois, de novembre 2026 à octobre 2027. Hypothèses non
 - **Seuils, si tout passe par la micro de Jay** :
   - TVA France (41 250 €) dépassée en mars 2027, avec TVA due dès ce jour sur les factures France ;
   - plafond micro (83 600 €) dépassé en mars 2027 aussi ;
-  - la micro a été créée en août 2026 : les seuils 2026 sont réduits au prorata des jours d'activité. Selon le jour exact de création (du 1ᵉʳ au 31 août) :
-    - TVA due dès **13 900 à 17 300 €** de CA France encaissé en 2026 ;
-    - plafond micro 2026 : **28 200 à 35 000 €**, sur tout le CA encaissé (France et US).
+  - la micro a été créée le 19 juillet 2026 : les seuils 2026 sont réduits au prorata des 166 jours d'activité :
+    - TVA au 1ᵉʳ janvier 2027 au-delà de **17 055 €** de CA France encaissé en 2026, et due dès le jour du dépassement au-delà de **18 760 €** ;
+    - plafond micro 2026 : **38 021 €**, sur tout le CA encaissé (France et US).
     Avec 6 + 6 clients dès novembre, ces deux seuils peuvent sauter dès décembre 2026. Dépasser le plafond en 2026 puis en 2027 ferait passer au régime réel au 1ᵉʳ janvier 2028.
 - **Heures** : avec les 10 à 13 h par client et par mois du calculateur, l'Essentiel à 390 € et le Starter à 497 $ perdent de l'argent dès qu'on paie l'heure de livraison (le plancher est à 672 € pour 11,5 h). À 6 h par client, le plancher tombe à 376 €.
 - **Embauches** (aux heures actuelles) :
@@ -134,14 +134,13 @@ La simulation est sur 12 mois, de novembre 2026 à octobre 2027. Hypothèses non
 
 **Réponses de Jay :**
 - **Micro de Jay** :
-  - créée en août 2026, activité « conseil, gestion, automatisation », sans ACRE ;
+  - créée le 19 juillet 2026, activité « conseil, gestion, automatisation », sans ACRE ;
   - c'est très probablement du BNC (cotisations 25,6 %), à confirmer avec le code APE sur l'avis de situation SIRENE.
 - **Junior** : résident fiscal au Cameroun, sans entreprise ni statut pour l'instant. Sa part est versée sur le résultat après cotisations et coûts.
 - **Prix US** : plus élevés qu'en France. Junior les fixe avec le skill `pricing-strategy`. Si le premier client US arrive avant les premiers résultats en France, les preuves serviront à monter les prix.
 - **Cockpit** : application web validée, avec un compte et un mot de passe par personne.
 
 **Encore ouvert :**
-- Jour exact de création de la micro (il fixe les seuils 2026 au prorata).
 - CA déjà encaissé en 2026.
 - Ce que Junior doit déclarer au Cameroun pour sa part (à voir de son côté).
 - Faut-il afficher le cash US converti en euros au QG ? Par défaut : taux BCE du jour de chaque paiement.
@@ -172,11 +171,10 @@ Le calcul a été refait de façon indépendante par un vérificateur.
 - **Limites de la SAS** : les dividendes ne se versent qu'une fois par an, après l'approbation des comptes, et sans salaire Jay n'a ni retraite ni assurance maladie.
 
 **Urgent :**
-1. **Versement libératoire** : demande possible jusqu'au 30 novembre 2026 (année de création), si le RFR 2024 de Jay est au plus 29 579 € (1 part).
-2. **TVA dès 2026** : les seuils 2026 sont au prorata de la création en août.
-   - Au-delà d'environ 15 700 € de CA France encaissé en 2026, la TVA s'applique au 1ᵉʳ janvier 2027.
-   - Au-delà d'environ 17 300 €, elle est due dès le jour du dépassement.
-   - Ces chiffres valent pour une création le 1ᵉʳ août ; ils sont plus bas si la création est plus tardive.
+1. **Versement libératoire** : demande à faire **avant le 31 octobre 2026** (dernier jour du 3ᵉ mois après le mois de création, juillet), si le RFR 2024 de Jay est au plus 29 579 € (1 part).
+2. **TVA dès 2026** : les seuils 2026 sont au prorata de la création le 19 juillet (166 jours).
+   - Au-delà de 17 055 € de CA France encaissé en 2026, la TVA s'applique au 1ᵉʳ janvier 2027.
+   - Au-delà de 18 760 €, elle est due dès le jour du dépassement.
    - À prévoir : numéro de TVA intracommunautaire, factures France à 20 %, contrats en « prix HT ».
 3. **Contrat écrit entre Jay et Junior** (sous-traitance ou apport d'affaires), pour encadrer le partage et éviter une « société créée de fait ».
 

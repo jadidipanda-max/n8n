@@ -6,6 +6,18 @@
 --   tva_majore    41 250 × 153 / 365 = 17 291,10
 --   plafond_micro 83 600 × 153 / 365 = 35 043,29
 -- CA 2026 des données d'exemple : France 3 690 €, total 3 690 + 888,33 = 4 578,33 €.
+--
+-- Date réelle de création de la micro de Jay : 19 juillet 2026, valeur par défaut de la migration.
+-- Du 19/07 au 31/12 inclus = 13 + 31 + 30 + 31 + 30 + 31 = 166 jours sur 365.
+--   tva_base 17 054,79 · tva_majore 18 760,27 · plafond_micro 38 020,82
+:en_jay
+select tests.egal('date de création par défaut (19 juillet 2026) : 166 jours',
+  (select concat_ws('|', jours_activite, tva_base, tva_majore, plafond_micro) from public.seuils_au(:ref)),
+  '166|17054.79|18760.27|38020.82');
+
+-- La suite du fichier garde son scénario de calcul d'origine (création au 1er août).
+:en_postgres
+update public.reglages set valeur = jsonb_set(valeur, '{date_creation}', '"2026-08-01"') where cle = 'seuils';
 :en_jay
 
 -- ---------------------------------------------------------------------

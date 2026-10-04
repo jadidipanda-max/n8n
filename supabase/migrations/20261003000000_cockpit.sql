@@ -319,7 +319,7 @@ create or replace trigger messages_avant_ajout before insert on public.messages
 -- 1.3 Réglages (n'écrase jamais une valeur déjà modifiée)
 -- ---------------------------------------------------------------------
 insert into public.reglages (cle, valeur) values
-  ('seuils',           '{"tva_base": 37500, "tva_majore": 41250, "plafond_micro": 83600, "date_creation": "2026-08-01", "annee_seuils": 2026}'),
+  ('seuils',           '{"tva_base": 37500, "tva_majore": 41250, "plafond_micro": 83600, "date_creation": "2026-07-19", "annee_seuils": 2026}'),
   ('cotisations',      '{"taux": 0.256, "regime": "BNC"}'),
   ('change',           '{"usd_eur": 0.891, "source": "BCE 2026-10-02"}'),
   ('objectif_mensuel', '{"fr": 6, "us": 6}'),

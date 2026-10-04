@@ -74,7 +74,7 @@ Triggers de liaison et de garde (en plus de `maj`) :
   ```json
   {
     "tva_base": 37500, "tva_majore": 41250, "plafond_micro": 83600,
-    "date_creation": "2026-08-01", "annee_seuils": 2026
+    "date_creation": "2026-07-19", "annee_seuils": 2026
   }
   ```
 - `cotisations` : `{"taux": 0.256, "regime": "BNC"}`. **À confirmer** sur l'avis de situation SIRENE.

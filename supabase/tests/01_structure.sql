@@ -42,7 +42,7 @@ select tests.ok('service_role peut insérer dans paiements',
 
 -- Réglages insérés par la migration
 select tests.egal('5 réglages', (select count(*) from public.reglages), 5::bigint);
-select tests.egal('seuils.date_creation', (select valeur ->> 'date_creation' from public.reglages where cle = 'seuils'), '2026-08-01');
+select tests.egal('seuils.date_creation', (select valeur ->> 'date_creation' from public.reglages where cle = 'seuils'), '2026-07-19');
 select tests.egal('seuils.tva_base', (select (valeur ->> 'tva_base')::numeric from public.reglages where cle = 'seuils'), 37500::numeric);
 select tests.egal('seuils.tva_majore', (select (valeur ->> 'tva_majore')::numeric from public.reglages where cle = 'seuils'), 41250::numeric);
 select tests.egal('seuils.plafond_micro', (select (valeur ->> 'plafond_micro')::numeric from public.reglages where cle = 'seuils'), 83600::numeric);

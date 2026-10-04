@@ -53,10 +53,10 @@ window.COCKPIT_DEMO = (() => {
   let total = 0;
   Object.keys(parJour).sort().forEach(jour => { total = r2(total + parJour[jour]); v_cash_cumul.push({ marche: 'total', jour, cumul: total, cumul_eur: total }); });
 
-  // seuils 2026 au prorata (micro créée le 1er août : 153 jours sur 365)
-  const prorata = 153 / 365;
+  // seuils 2026 au prorata (micro créée le 19 juillet : 166 jours sur 365)
+  const prorata = 166 / 365;
   const v_seuils = {
-    annee: 2026, ca_france_eur: fr.cumul, ca_total_eur: r2(fr.cumul + us.cumul * FX), jours_activite: 153, jours_annee: 365,
+    annee: 2026, ca_france_eur: fr.cumul, ca_total_eur: r2(fr.cumul + us.cumul * FX), jours_activite: 166, jours_annee: 365,
     tva_base: r2(37500 * prorata), tva_majore: r2(41250 * prorata), plafond_micro: r2(83600 * prorata),
     alerte_tva: 'ok', alerte_micro: 'ok',
   };
