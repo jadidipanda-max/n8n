@@ -28,3 +28,23 @@ Page publiée sur claude.ai (artifact privé). Ce fichier est une copie du code 
 - Scripts dans `outils/pest/`, à lancer dans un dossier de travail hors du dépôt (ils lisent et écrivent `raw/`, `sites/`, `leads_pest.json`) :
   `run_pest.py` (collecte Apify) → `process_pest.py` (tri, registre, note ICP) → `crawl_sites.py` (lecture des sites) → `reg_check.py` (établissements, siège, CA) → `verify_pest.py` (signaux : franchise, agences, capital, numéros partagés, portable du site, nom) → relecture à la main → `apply_verify.py` (exclusions et corrections) → `mk_lots.py` (lots de 50).
 - `mk_pest.py` reconstruit `pest.html` à partir de `acquisition.html` (à lancer depuis `crm-s2l/`).
+
+## Écran Chauffage-Clim (11 octobre)
+
+- `cvc.html` : même écran que Pest Control, adapté au chauffage, à la climatisation et à la plomberie-chauffage. Leads dans la collection `lots` (6 documents), résultats dans `resultats`.
+- **ICP** : entreprise indépendante de 3 à 15 personnes (au moins 2 techniciens), qui fait du dépannage et de l'entretien en plus de l'installation, avec au moins 30 avis Google, plusieurs communes desservies, une urgence ou une intervention rapide affichée, pas de standard permanent, et un gérant joignable sur son portable.
+- **Collecte** : Google Maps via Apify, 30 villes × « chauffagiste » et « climatisation », 600 fiches, 3 $.
+- **Contrôles automatiques** (`process_cvc.py`) :
+  - au moins 30 avis Google ;
+  - retrait des grands groupes, enseignes et distributeurs (Savelys, IZI by EDF, Proxiserve, Sonepar…) ;
+  - retrait des réseaux repérés parce qu'ils ont le même site ou le même numéro dans plusieurs villes (Clim+, Garanka, Solaire Clim Chauffage, SL2A, Axenergie…) ;
+  - au registre : retrait des entreprises de 20 salariés ou plus et des codes d'activité de commerce ;
+  - lecture du site : dépannage, entretien, installation, urgence, communes desservies, secrétariat ou service client, portable de l'entreprise, nom du responsable.
+- **Relecture à la main** (`exclusions.json`, appliquée par `apply_cvc.py`) :
+  - retrait des franchises et réseaux d'agences (Kaltea, Intergaz, Selfcity, MonChauffagiste, Hello Depann'…), des entreprises à 3 agences ou établissements ou plus, des filiales de groupe, des dépanneurs qui font aussi de la serrurerie et des centres d'appel ;
+  - retrait des entrepreneurs individuels sans salarié déclaré, probablement seuls alors que l'ICP demande au moins 2 techniciens.
+- **Priorités** :
+  - P1 : taille confirmée au registre (3 à 19 salariés) et portable ;
+  - P2 : portable, taille à confirmer pendant l'appel ;
+  - P3 : ligne fixe.
+- `mk_cvc.py` reconstruit `cvc.html` à partir de `pest.html` (à lancer depuis `crm-s2l/`).
