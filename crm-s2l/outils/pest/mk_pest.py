@@ -97,5 +97,9 @@ sub('f("nom", "Nom de l\'agence ou du freelance", "text", m.nom, "Agence Untel�
 t = t.replace('"Qui gère ses pubs", "Prestataire", "Avec ce prestataire depuis", "Frais de gestion €/mois"', '"Qui lui apporte des clients", "Prestataire", "Avec ce prestataire depuis", "Payé au prestataire €/mois"')
 t = t.replace('<th>Qui gère ses pubs</th>', '<th>Qui lui apporte des clients</th>')
 
+# Pitch d'appel (accroche, questions, proposition, calcul, fermeture, objections)
+import os, sys; sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')); import pitch
+t = pitch.inject(t, pitch.PEST)
+
 open('pest.html', 'w', encoding='utf-8').write(t)
 print('ok', len(t))

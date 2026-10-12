@@ -163,6 +163,12 @@ textarea.field { min-height: 96px; resize: vertical; line-height: 1.5; margin-to
 .sb-sans_form { background: var(--st-rap-soft); color: var(--st-rap); }
 .sb-form, .sb-chat { background: var(--st-int-soft); color: var(--st-int); }
 .attn { margin-top: 10px; font-size: 13px; line-height: 1.5; color: var(--st-rap); }
+.obj { font-size: 14px; line-height: 1.55; }
+.obj summary { cursor: pointer; font-weight: 700; color: var(--accent); font-size: 13px; }
+.obj dl { margin: 10px 0 0; display: grid; gap: 8px; }
+.obj dt { font-weight: 600; }
+.obj dd { margin: 2px 0 0; color: var(--muted); }
+.obj p { margin: 10px 0 0; color: var(--muted); }
 .hookbox { border-left: 3px solid var(--st-rap); padding-left: 12px; font-size: 16px; line-height: 1.55; }
 .tag.hot { border-color: var(--accent); color: var(--accent); }
 .qs { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 15px; }
@@ -311,6 +317,7 @@ h4.mkh { font-size: 12px; font-weight: 600; color: var(--muted); margin: 16px 0 
   var MK_HEAD = ["Qui lui apporte des clients", "Prestataire", "Avec ce prestataire depuis", "Payé au prestataire €/mois", "Budget pub €/mois", "Fait des pubs depuis", "Demandes/mois", "Satisfaction", "Fin d'engagement"];
   var NOMF = { sur: "nom sûr, vérifié sur son site", probable: "nom probable (registre : nom + département)", a_confirmer: "nom à confirmer : commence par « Je suis bien chez… ? »", site: "nom affiché sur son propre site" };
   var SITE_LBL = { absent: "Pas de site", sans_form: "Site sans formulaire ni chat", form: "Site avec formulaire", chat: "Site avec chat / WhatsApp", a_verifier: "Site à vérifier" };
+  /* PITCH */ var PITCH = {"accroche": "Quand vous êtes dans des combles ou chez un client avec vos gants, qui répond à votre téléphone ? Et la personne qui découvre des punaises à 22 h, ou un nid de frelons au-dessus de sa terrasse : si elle tombe sur votre messagerie, elle rappelle ou elle appelle le suivant ?", "questions": ["Combien d'appels vous ratez par jour, à votre avis ?", "En ce moment, avec les rongeurs qui rentrent dans les maisons, c'est pire ?", "Un chantier punaises, ça vous rapporte combien en moyenne ?"], "proposition": "On installe un assistant téléphonique qui décroche quand vous ne pouvez pas. Vous gardez votre numéro. Il se présente comme votre assistant, demande le nuisible, l'adresse, le type de logement et l'urgence, propose un créneau et vous envoie un SMS de résumé tout de suite. Les vraies urgences vous sont transférées. Ceux qui veulent juste un prix reçoivent une fourchette et un rendez-vous de diagnostic.", "calcul": "« Si vous ratez 3 appels par jour et qu'un seul est un chantier punaises, ça fait combien par mois ? » Laisse-le faire le calcul.", "repondeur": "« Je vous ai appelé tout à l'heure et je suis tombé sur votre messagerie, exactement comme vos clients quand vous êtes en intervention. C'est ce que je règle : combien de clients tombent sur votre répondeur chaque semaine ? »", "message": "« Bonjour, Jay de J-Square. Je vous ai appelé et je suis tombé sur votre messagerie, exactement comme vos clients quand vous êtes en intervention. C'est ce que je règle. Je vous rappelle [jour] à [heure]. »", "objections": [["Je rappelle toujours mes clients.", "Le soir, oui. Mais celui qui avait des punaises à 14 h a déjà appelé quelqu'un d'autre à 14 h 05. L'assistant ne vous remplace pas : il prend le rendez-vous pendant que vous travaillez."], ["Les clients n'aiment pas parler à une machine.", "Ils aiment encore moins la messagerie. L'assistant se présente clairement, ne fait pas attendre et vous envoie tout par SMS : vous rappelez qui vous voulez."], ["J'ai une secrétaire.", "Parfait. Et entre 12 h et 14 h, après 18 h et le samedi ? L'assistant prend le relais quand elle n'est pas là."], ["Pas le temps de mettre ça en place.", "C'est nous qui installons tout : un simple renvoi d'appel quand vous ne décrochez pas. Rien à changer de votre côté."], ["C'est combien ?", "Moins qu'un chantier par mois. Je vous montre d'abord que ça marche avec vos appels, et on parle du prix à la démo."]]}; /* /PITCH */
   var INTERETS = [{ k: "assistant", label: "Assistant qui décroche" }, { k: "sms", label: "SMS de résumé" }, { k: "agenda", label: "Prise de RDV" }, { k: "urgence", label: "Transfert des urgences" }, { k: "avis", label: "Avis Google" }, { k: "site", label: "Site / formulaire" }];
   var ZONES = { "P1": "Priorité 1 (5 à 8 pts)", "P2": "Priorité 2 (3 à 4 pts)", "P3": "Priorité 3 (0 à 2 pts)" };
   var LIVRE = {
@@ -621,6 +628,7 @@ h4.mkh { font-size: 12px; font-weight: 600; color: var(--muted); margin: 16px 0 
     if (l.urlSiren) links.push('<a class="btn" href="' + esc(l.urlSiren) + '" target="_blank" rel="noopener">Fiche entreprise</a>');
     links.push('<a class="btn" href="https://www.google.com/search?q=' + encodeURIComponent(l.annonceur + " " + (l.ville || "")) + '" target="_blank" rel="noopener">Recherche Google</a>');
     var dis = canWrite ? "" : " disabled";
+    var court = String(l.annonceur || "").split(/\s[-–|]\s|\s\(|\|/)[0].slice(0, 40);
     var stars = l.noteGoogle ? String(l.noteGoogle).replace(".", ",") + " ★" : "—";
     var raisons = (l.siteRaisons || []).slice(0, 4);
     sheet.innerHTML =
@@ -638,13 +646,16 @@ h4.mkh { font-size: 12px; font-weight: 600; color: var(--muted); margin: 16px 0 
         '<div class="situ-card"><div class="k">Registre</div><div class="v">' + (l.creation ? "Créée en " + esc(l.creation) : "—") + ' <small>' + esc(l.effectif || "effectif inconnu") + '</small></div></div>' +
       '</div><div class="links">' + links.join("") + "</div></div>" +
       '<div class="sheet-sec script">' +
-        '<div><div class="lbl">Ouverture</div><div class="ask">' + (nm ? "« Bonjour, <b>" + esc(nm) + "</b> ? Jay, de J-Square. »" : "« Bonjour, je suis bien avec le gérant ou la gérante de <b>" + esc(l.annonceur) + "</b> ? Jay, de J-Square. »") + "</div></div>" +
-        (hist(l.id).some(function (e) { return e.s === "no_rep"; }) ? '<div><div class="lbl">Il était sur messagerie : commence par ça</div><div class="hookbox">« Je vous ai appelé tout à l\'heure et je suis tombé sur votre messagerie. C\'est exactement ce que je règle : combien de clients tombent sur votre répondeur chaque semaine ? »</div></div>' : "") +
-        '<div><div class="lbl">Accroche</div><div class="hook">' + esc(l.accroche || "") + "</div></div>" +
-        '<div><div class="lbl">Questions à poser</div><ol class="qs"><li>Quand vous êtes en intervention, qui répond au téléphone ?</li><li>Combien d\'appels vous ratez par jour, à votre avis ?</li><li>Un client qui tombe sur votre messagerie, il rappelle ou il appelle le suivant ?</li><li>Vous payez des plateformes pour avoir des demandes ? Combien par demande ?</li></ol></div>' +
-        '<div class="deliver"><b>Ce qu\'on lui livre :</b> un assistant téléphonique qui décroche quand il ne peut pas (il garde son numéro), note l\'adresse, le nuisible et l\'urgence, propose un créneau, lui envoie un SMS de résumé tout de suite et lui transfère les urgences. L\'assistant se présente comme assistant.</div>' +
+        '<div><div class="lbl">Ouverture</div><div class="ask">' + (nm ? "« Bonjour, <b>" + esc(nm) + "</b> ? Jay, de J-Square. " : "« Bonjour, je suis bien avec le gérant ou la gérante de <b>" + esc(court) + "</b> ? Jay, de J-Square. ") + "J\'ai vu votre fiche Google" + (l.avis ? ", " + l.avis + " avis, c\'est du sérieux" : "") + ". Vos coordonnées viennent de cette fiche et du registre des entreprises : si vous ne voulez pas que je vous rappelle, dites-le-moi. Vous avez 30 secondes ? »</div></div>" +
+        (hist(l.id).some(function (e) { return e.s === "no_rep"; }) ? '<div><div class="lbl">Il était sur messagerie : commence par ça</div><div class="hookbox">' + esc(PITCH.repondeur) + "</div></div>" : "") +
+        '<div><div class="lbl">Accroche</div><div class="hook">« ' + esc(PITCH.accroche) + " »</div></div>" +
+        '<div><div class="lbl">Questions à poser</div><ol class="qs">' + PITCH.questions.map(function (q) { return "<li>" + esc(q) + "</li>"; }).join("") + "</ol></div>" +
+        '<div><div class="lbl">Ce qu\'on lui propose</div><div class="deliver">' + esc(PITCH.proposition) + "</div></div>" +
+        '<div><div class="lbl">Fais-lui calculer</div><div class="ask">' + esc(PITCH.calcul) + "</div></div>" +
+        '<div><div class="lbl">Fermeture : objectif rendez-vous de démo</div><div class="ask">« Le plus simple, c\'est que vous l\'entendiez répondre au nom de <b>' + esc(court) + "</b>. Je vous le montre en 15 minutes : demain ou jeudi ? »</div></div>" +
+        '<details class="obj"><summary>Objections et message de répondeur</summary><dl>' + PITCH.objections.map(function (o) { return "<dt>« " + esc(o[0]) + " »</dt><dd>" + esc(o[1]) + "</dd>"; }).join("") + "</dl><p><b>S\'il ne répond pas, laisse ce message :</b> " + esc(PITCH.message) + "</p></details>" +
         (why.length ? '<div><div class="lbl">Pourquoi c\'est une bonne cible</div><div class="why">' + why.map(function (w) { return "<span>" + esc(w) + "</span>"; }).join("") + "</div></div>" : "") +
-        '<div class="legal">À dire dès le début : ses coordonnées viennent de sa fiche Google et du registre des entreprises ; il peut refuser d\'être rappelé (dans ce cas : « Pas intéressé »). Ne dis pas « IA » : dis « assistant téléphonique ».</div>' +
+        '<div class="legal">Ne dis jamais « IA » : dis « assistant téléphonique ». Ne cite aucun chiffre de vendeur : fais-lui calculer ses propres pertes. S\'il refuse d\'être rappelé : « Pas intéressé ».</div>' +
       "</div>" +
       '<div class="sheet-sec"><div class="lbl">Résultat de l\'appel</div><div class="outcomes">' +
         STATUTS.map(function (s, i) { return '<button class="oc s-' + s.k + '" data-s="' + s.k + '" aria-pressed="' + (rr.statut === s.k) + '"' + dis + ">" + ICONS[s.k] + "<span>" + s.label + "</span><kbd>" + (i + 1) + "</kbd></button>"; }).join("") +

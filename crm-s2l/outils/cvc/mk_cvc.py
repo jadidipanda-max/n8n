@@ -37,10 +37,8 @@ sub("""situ-card"><div class="k">Registre</div><div class="v">' + (l.creation ? 
     """situ-card"><div class="k">Zone</div><div class="v">' + (l.multiCommunes ? "Plusieurs communes" : "Non affichée") + ' <small>' + (l.creation ? "créée en " + esc(l.creation) : "") + '</small></div></div>' +""")
 
 # Fiche : script
-sub("""<ol class="qs"><li>Quand vous êtes en intervention, qui répond au téléphone ?</li><li>Combien d\\'appels vous ratez par jour, à votre avis ?</li><li>Un client qui tombe sur votre messagerie, il rappelle ou il appelle le suivant ?</li><li>Vous payez des plateformes pour avoir des demandes ? Combien par demande ?</li></ol>""",
-    """<ol class="qs"><li>Quand vous êtes chez un client ou sous une chaudière, qui répond au téléphone ?</li><li>En pleine saison de chauffe, combien d\\'appels vous ratez par jour ?</li><li>Un client sans chauffage qui tombe sur votre messagerie, il rappelle ou il appelle le suivant ?</li><li>Vos contrats d\\'entretien, vous relancez vos clients chaque année ? Comment ?</li></ol>""")
-sub("""note l\\'adresse, le nuisible et l\\'urgence, propose un créneau, lui envoie un SMS de résumé tout de suite et lui transfère les urgences.""",
-    """note l\\'adresse, l\\'appareil, la panne et l\\'urgence, propose un créneau, lui envoie un SMS de résumé tout de suite et lui transfère les urgences (fuite, plus de chauffage). En option : la relance des entretiens annuels.""")
+import os, sys; sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')); import pitch
+t = pitch.swap(t, pitch.CVC)
 sub('placeholder="Appels ratés par jour, qui répond en intervention, plateformes payées (prix par demande), objection, qui décide…"',
     'placeholder="Appels ratés par jour, qui répond en intervention, secrétaire ou pas, nombre de techniciens, contrats d’entretien, objection, qui décide…"')
 

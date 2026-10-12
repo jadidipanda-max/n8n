@@ -48,3 +48,8 @@ Page publiée sur claude.ai (artifact privé). Ce fichier est une copie du code 
   - P2 : portable, taille à confirmer pendant l'appel ;
   - P3 : ligne fixe.
 - `mk_cvc.py` reconstruit `cvc.html` à partir de `pest.html` (à lancer depuis `crm-s2l/`).
+
+## Pitch dans les écrans (12 octobre)
+
+- Les écrans Pest Control et Chauffage-Clim affichent le pitch complet issu de `offre-s2l/pain-points-pitchs.md` : ouverture (avec le nombre d'avis et l'origine des coordonnées), accroche, 3 questions, proposition, calcul à faire faire au prospect, fermeture sur un rendez-vous de démo, puis un volet repliable « Objections et message de répondeur ».
+- Les textes sont dans `outils/pitch.py` (un bloc par niche). `mk_pest.py` les injecte dans `pest.html`, puis `mk_cvc.py` remplace le bloc par celui du chauffage-clim. Pour changer un texte, modifier `pitch.py`, relancer les deux scripts depuis `crm-s2l/`, puis republier.
