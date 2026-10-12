@@ -254,6 +254,49 @@ Ce qu'on peut dire honnêtement : **7,83 € est sous le plancher de toutes les 
 
 ---
 
+## 5 bis. La réponse qui change tout : ce que les prospects ont produit
+
+Communiqué par Jay le 12/10/2026 au soir, de mémoire d'un appel avec Jérôme : **sur ses 60 derniers prospects, 4 ventes et 3 mandats.** Jay signale qu'**une des ventes viendrait du bouche-à-oreille** et pas de la publicité. Donnée déclarative, non encore vérifiée sur pièces.
+
+Au prorata, 60 prospects sur 85 représentent **469,72 €** de dépense publicitaire.
+
+| Lecture | Affaires | Taux prospect → affaire | Coût pub par affaire | Coût pub par vente |
+|---|---|---|---|---|
+| Déclaré (4 ventes + 3 mandats) | 7 | 11,7 % | 67,10 € | 117,43 € |
+| Si une vente est hors publicité | 6 | 10,0 % | 78,29 € | 156,57 € |
+
+**Le retour sur investissement, selon ce qu'une vente lui laisse net :**
+
+| Net par vente | 3 ventes attribuables | 4 ventes attribuables |
+|---|---|---|
+| 3 000 € | ×19 | ×26 |
+| 5 000 € | ×32 | ×43 |
+| 8 000 € | ×51 | ×68 |
+| 12 000 € | ×77 | ×102 |
+
+**La conclusion ne dépend d'aucune des incertitudes.** Même au plus défavorable — une vente retirée pour bouche-à-oreille, la commission la plus basse — on est à **×19**. Toutes les questions de création, de format et de ciblage traitées dans ce rapport portent sur des écarts de quelques dizaines d'euros par mois. Elles sont du bruit à côté de ça.
+
+### Ce que ça change dans la stratégie
+
+**La question n'est plus « quelle création ». C'est : pourquoi ne dépense-t-il que 3 € par jour ?**
+
+Un canal qui rend ×19 au pire et qu'on alimente à 90 €/mois est un canal qu'on sous-exploite massivement. Le facteur limitant n'est ni le visuel, ni la vidéo, ni l'arrondissement : **c'est le budget.**
+
+Deux garde-fous avant de pousser :
+
+1. **Le coût par prospect montera.** Sa propre courbe de rendement le prouve déjà (section 5) : 2,87 prospects pour mille impressions sur une audience neuve, 0,78 sur son plus gros ensemble, 0 sur le dernier. Monter le budget épuise l'audience bon marché d'abord. **Ne jamais promettre une montée linéaire.**
+2. **Sa capacité est un plafond réel.** À 3 €/jour il reçoit environ 11 prospects par mois. À 30 €/jour il en recevrait de l'ordre de 115 — qu'un mandataire seul ne peut ni rappeler vite, ni qualifier, ni visiter. **Le bon palier est celui qu'il peut absorber**, pas celui que le budget permet. C'est la conversation à avoir avec lui, et c'est aussi là que notre rappel en moins d'une minute prend toute sa valeur : il relève ce plafond.
+
+### Ce qui reste à vérifier sur ces chiffres
+
+- **Le transcript de l'appel** où Jérôme donne ces chiffres : non communiqué à ce jour.
+- **Quels 60 prospects**, sur quelle période ? La dépense au prorata suppose une répartition uniforme, ce qui est faux : trois quarts des prospects viennent des deux plus anciens ensembles.
+- **La vente issue du bouche-à-oreille** : à retirer formellement du compte.
+- **Ce qu'une vente lui laisse net**, après la part du réseau SAFTI et ses cotisations. C'est le seul chiffre qui manque pour arrêter le tableau ci-dessus.
+- **Un taux de 11,7 % de prospect → affaire est 2 à 8 fois au-dessus de la fourchette modélisée** (1,2 à 4,7 %, sources faibles). Soit Jérôme est très au-dessus du marché, soit une partie de ces affaires n'est pas attribuable aux pubs. Les deux méritent d'être tranchées — pas pour rabattre le résultat, mais pour savoir ce qu'on promet au prochain client.
+
+---
+
 ## 6. Le modèle gagnant, décortiqué
 
 Le modèle à copier n'est **pas** le template que Jérôme a déjà : c'est ce que font les annonceurs qui tiennent 400 à 1 000 jours. Une recette en 6 briques, qui garde son angle (l'estimation hyper-locale) et ajoute ce qui lui manque.
@@ -373,7 +416,8 @@ Les conclusions de ce rapport ont été soumises à quatre analyses contradictoi
 | « Paris 13ᵉ est sa meilleure zone, coupée trop tôt » | **Abandonné** — le 15ᵉ a fait 0 prospect pour la même somme ; 1,54 € est un prix de lancement d'audience neuve |
 | Tester le 13ᵉ reste la bonne décision | **Solide**, pour une autre raison : usure du 14ᵉ et CPM le plus bas du compte |
 | Le budget est trop petit pour sortir de l'apprentissage | **Solide**, mais regrouper ne suffira pas (il faudrait 40 à 60 €/jour) |
-| « Son problème est la transformation, pas l'acquisition » | **Abandonné** — zéro observation dans les données pour l'étayer |
+| « Son problème est la transformation, pas l'acquisition » | **Abandonné** — et démenti depuis : 4 ventes et 3 mandats sur 60 prospects (section 5 bis) |
+| Le facteur limitant est le budget, pas la création | **Nouveau, et robuste** — ×19 au pire pour 3 €/jour de budget |
 
 ---
 
