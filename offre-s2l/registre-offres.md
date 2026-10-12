@@ -19,6 +19,18 @@ Règles pour remplir le registre :
 | Premium | à partir de 1 190 €/mois | — | après les pilotes |
 | Pilote (2 à 3 clients) | 190 €/mois pendant 3 mois | offerte | puis prix normal, écrit dès le départ |
 
+## Grille de l'assistant téléphonique « Zéro appel perdu » (pest control, chauffage-clim)
+
+Communiquée par Jay le 12 octobre 2026. Ce qui reste = après 25,6 % de cotisations (× 0,744) et 40 €/mois de coût technique.
+
+| | Pilote (3 premiers clients) | Prix normal (à partir du 4ᵉ client) |
+|---|---|---|
+| Mise en place | 590 € (plancher : 538 €) | 990 € |
+| Chaque mois | 190 € pendant 3 mois, puis 290 € | 290 € |
+| Ce qui reste à la mise en place | 439 €, soit 44 €/h | 737 €, soit 74 €/h |
+| Ce qui reste chaque mois | 101 €, soit 34 €/h | 176 €, soit 59 €/h |
+| Total facturé sur 3 mois, par client | 1 160 € | 1 860 € |
+
 ## Offres faites
 
 | Date | Client | Niche | Offre | Prix J-Square | Mise en place / cadeaux | Durée et paiement | Garantie | Valable jusqu'au | Statut |
