@@ -297,6 +297,62 @@ Deux garde-fous avant de pousser :
 
 ---
 
+## 5 ter. Quel budget publicitaire
+
+### Le point de départ : il est sous notre propre plancher
+
+La grille J-Square impose, pour le palier **Essentiel**, « un budget pub d'au moins **300 €/mois** ». Jérôme tourne à **3 €/jour, soit environ 90 €/mois** — le tiers du minimum que nous écrivons nous-mêmes dans nos offres.
+
+Pire, le rapport est inversé : il paie **400 €/mois de gestion pour 90 € de média**, soit 4,4 € de prestation par euro investi en publicité. L'usage est l'inverse. Monter à 600 €/mois de budget ramène ce rapport à 0,67, ce qui est sain.
+
+**Le premier palier n'est donc pas une négociation, c'est une mise en conformité avec l'offre qu'il a signée.**
+
+### Le modèle, bâti sur ses chiffres à lui
+
+Deux dégradations sont appliquées, parce que **sa propre courbe de rendement les montre déjà** (section 5) : en montant le budget, le coût par prospect augmente (l'audience bon marché s'épuise la première) et le taux de transformation baisse (les meilleurs prospects arrivent en premier).
+
+⚠️ **Les coefficients de dégradation ci-dessous sont des hypothèses de ma part, pas des mesures.** Ils sont volontairement pessimistes. C'est précisément pour ça que la montée doit se faire par paliers mesurés et non d'un coup.
+
+| €/jour | €/mois | Coût/prospect retenu | Prospects/mois | Taux retenu | Affaires/mois | Coût pub par affaire |
+|---|---|---|---|---|---|---|
+| 3 | 90 | 7,83 € | 11 | 11,7 % | 1,3 | 67 € |
+| **10** | **300** | 9,00 € | 33 | 8,8 % | 2,9 | 103 € |
+| **20** | **600** | 11,00 € | 55 | 6,4 % | **3,5** | 171 € |
+| 30 | 900 | 13,00 € | 69 | 4,7 % | 3,2 | 279 € |
+| 40 | 1 200 | 15,00 € | 80 | 3,5 % | 2,8 | 429 € |
+
+**La courbe plafonne vers 20 €/jour**, puis redescend : au-delà, le budget supplémentaire achète des prospects plus chers et moins bons. Ce n'est pas une limite de Meta, c'est la forme normale des rendements décroissants sur une zone géographique étroite.
+
+### Le vrai plafond n'est pas le budget, c'est lui
+
+Jérôme a traité **85 prospects en dix mois et demi, soit environ 8 par mois.** Les paliers ci-dessus lui en demandent :
+
+| Palier | Prospects/mois | Par rapport à son rythme actuel |
+|---|---|---|
+| 10 €/jour | 33 | ×4 |
+| 20 €/jour | 55 | ×7 |
+| 30 €/jour | 69 | ×8,5 |
+
+**Un mandataire seul ne passe pas de 8 à 55 rappels par mois du jour au lendemain.** C'est la contrainte dure du dossier, et c'est aussi là que notre prestation se justifie : le rappel en moins d'une minute et le tri automatique sont exactement ce qui relève ce plafond. Sans eux, monter le budget revient à acheter des prospects qui mourront dans sa messagerie.
+
+### Recommandation : deux paliers, avec une porte entre les deux
+
+**Palier 1 — 10 €/jour (300 €/mois), pendant 6 semaines.**
+C'est le plancher contractuel, et c'est ×4 son rythme actuel : déjà exigeant. On y vérifie trois choses : le coût par prospect tient-il sous 10 € ? Rappelle-t-il tout sous 24 h ? Le taux de transformation tient-il au-dessus de 6 % ?
+
+**Porte de décision.** Si les trois tiennent, on passe au palier 2. Si le taux s'effondre sous 4 %, on reste à 300 € et on travaille la qualification du formulaire plutôt que le volume.
+
+**Palier 2 — 20 €/jour (600 €/mois).**
+C'est l'optimum du modèle : environ 3,5 affaires par mois pour 171 € de publicité chacune.
+
+**Ne jamais sauter de 3 à 20 d'un coup** : un changement brutal de budget relance la phase d'apprentissage de Meta et fait flamber le coût pendant plusieurs jours. On monte par paliers d'environ 30 % tous les 3 à 4 jours.
+
+### Au-dessus, seulement si trois conditions sont réunies
+
+Passer 600 €/mois n'a de sens que si, simultanément : le taux de transformation tient au-delà de 6 %, Jérôme absorbe réellement 55 prospects par mois, et l'audience 13ᵉ+14ᵉ+15ᵉ n'est pas saturée (fréquence surveillée, elle est déjà à 2,3 sur le seul 14ᵉ). À défaut, l'argent supplémentaire est mieux employé ailleurs : une seconde zone, ou du budget sur l'angle « acquéreurs actifs ».
+
+---
+
 ## 6. Le modèle gagnant, décortiqué
 
 Le modèle à copier n'est **pas** le template que Jérôme a déjà : c'est ce que font les annonceurs qui tiennent 400 à 1 000 jours. Une recette en 6 briques, qui garde son angle (l'estimation hyper-locale) et ajoute ce qui lui manque.
