@@ -2,7 +2,7 @@
 
 Document de travail interne. Il sert à cadrer le projet avant le prochain rendez-vous avec la gérante, à estimer le travail et à fixer le prix.
 
-C Pizza est au Cameroun : les clients paient par Orange Money et MTN MoMo, ou à la livraison. Les montants sont en FCFA.
+C Pizza est au Cameroun : les clients paient par Orange Money ou MTN MoMo, toujours avant la préparation : il n'y a pas de paiement à la livraison. Les montants sont en FCFA.
 
 ## Ce que la gérante veut
 
@@ -28,8 +28,8 @@ Un seul outil pour tous les points C Pizza. Il prend la commande sur WhatsApp, v
 1. Le client écrit sur WhatsApp. Le bot prend la commande : produits, tailles, suppléments, mode (livraison, à emporter, sur place), quartier, point de repère et localisation partagée, heure souhaitée.
 2. Le logiciel choisit le site. En livraison, c'est le site ouvert qui livre ce quartier. À emporter ou sur place, le client choisit parmi les sites ouverts.
 3. Le logiciel calcule le total : produits, frais de livraison, remises, minimum de commande. Il donne aussi le délai estimé.
-4. Le bot envoie le récapitulatif et demande : « Orange Money, MoMo ou paiement à la livraison ? »
-5. Pour Orange Money ou MoMo, le client reçoit sur son téléphone une demande de paiement de C Pizza et la valide avec son code secret. L'opérateur prévient le logiciel et la commande passe « payée ».
+4. Le bot envoie le récapitulatif et demande : « Orange Money ou MoMo ? »
+5. Le client reçoit sur son téléphone une demande de paiement de C Pizza et la valide avec son code secret. L'opérateur prévient le logiciel et la commande passe « payée ».
 6. Le client reçoit sa confirmation avec son numéro de commande et l'heure estimée.
 7. La commande s'affiche sur l'écran cuisine du site, avec une alerte sonore, et le ticket s'imprime.
 8. La cuisine appuie sur « Commencer », puis sur « Prête ».
@@ -45,7 +45,6 @@ Chaque changement de statut est noté dans un journal : qui l'a fait et à quell
 |---|---|---|
 | `attente_paiement` | Le bot, quand le client a choisi Orange Money ou MoMo | Récapitulatif + « Validez le paiement sur votre téléphone » |
 | `payee` | L'opérateur, par l'agrégateur de paiement (automatique) | Confirmation, numéro de commande, heure estimée |
-| `a_encaisser` | Le bot, si le client paie à la livraison ou au comptoir | Confirmation avec le montant à prévoir |
 | `en_preparation` | La cuisine (« Commencer ») | « Votre commande est en préparation » |
 | `prete` | La cuisine (« Prête ») | À emporter ou sur place : « Votre commande n° 42 est prête » |
 | `en_livraison` | Le livreur (« Parti ») | « Votre livreur est en route », avec son prénom et son numéro |
@@ -89,19 +88,15 @@ Les commissions viennent d'articles de prestataires. **Il faut demander une gril
 
 **Solution de transition (si le compte chez l'agrégateur tarde) :** le restaurant garde son numéro marchand Orange Money ou MoMo. Un petit téléphone Android, avec la puce de ce numéro, transfère au logiciel chaque SMS de confirmation de paiement. Le logiciel lit le montant, le numéro qui a payé et la référence de la transaction, puis retrouve la commande qui attend ce montant. Si le client a payé depuis un autre numéro, le bot lui demande la référence de la transaction. Cette solution marche, mais elle dépend d'un téléphone allumé et du format des SMS : ce n'est pas la solution finale.
 
-**Paiement à la livraison ou au comptoir :**
-
-- La commande part en cuisine avec la mention « à encaisser 7 500 FCFA ». Pour éviter les fausses commandes : le réserver aux clients qui ont déjà été livrés, ou fixer un montant maximum.
-- Le livreur peut encaisser par Orange Money ou MoMo depuis son appli : il appuie sur « Encaisser », le client reçoit la demande de paiement sur son téléphone et le logiciel voit le paiement. Le livreur transporte moins d'espèces.
-- Pour les espèces, le livreur appuie sur « Encaissé en espèces ». La gérante voit chaque soir ce que chaque livreur doit remettre.
+**Pas de paiement à la livraison :** toutes les commandes WhatsApp sont payées par Orange Money ou MoMo avant d'être préparées. La cuisine et les livreurs ne voient que des commandes payées, et le livreur n'a rien à encaisser.
 
 **Règles à programmer :**
 
-- Pas de validation au bout de 5 minutes, ou solde insuffisant : le bot propose de renvoyer la demande, de changer de numéro ou d'opérateur, ou de payer à la livraison. Sans paiement au bout de 20 minutes, la commande est annulée.
+- Pas de validation au bout de 5 minutes, ou solde insuffisant : le bot propose de renvoyer la demande ou de changer de numéro ou d'opérateur. Sans paiement au bout de 20 minutes, la commande est annulée.
 - **Une capture d'écran ou un SMS transféré par le client ne valent jamais paiement.** Seule la confirmation de l'opérateur compte. Cela supprime les fraudes aux fausses captures.
 - Paiement reçu après l'annulation : remboursement par l'agrégateur sur le numéro du client, ou commande réactivée si le site peut encore la préparer.
 - Double paiement : le deuxième est remboursé automatiquement.
-- Réseau de l'opérateur en panne : le bot propose le paiement à la livraison.
+- Réseau de l'opérateur en panne : le bot propose de payer avec l'autre opérateur, ou de réessayer un peu plus tard.
 
 ### 3. L'envoi en cuisine
 
@@ -119,8 +114,8 @@ Les commissions viennent d'articles de prestataires. **Il faut demander une gril
 
 - Quand la commande passe « Prête » (ou dès « Commencer », pour que le livreur se prépare), elle est proposée aux livreurs du site sur leur téléphone. Le premier qui appuie sur « Je prends » l'a.
 - L'appli livreur est une page web légère : elle marche sur un petit Android et consomme peu de données.
-- La fiche du livreur contient le quartier, le point de repère, un bouton pour ouvrir la position du client dans Google Maps, le téléphone du client, les consignes et le montant à encaisser s'il y en a un.
-- Boutons « Parti », « Livrée », « Encaisser » et « Client injoignable ».
+- La fiche du livreur contient le quartier, le point de repère, un bouton pour ouvrir la position du client dans Google Maps, le téléphone du client et les consignes. Il n'y a rien à encaisser : la commande est déjà payée.
+- Boutons « Parti », « Livrée » et « Client injoignable ».
 - Si personne n'accepte en 5 minutes, le responsable du site est alerté.
 - Plus tard : regrouper deux commandes du même quartier dans une même course.
 
@@ -145,7 +140,7 @@ Les commissions viennent d'articles de prestataires. **Il faut demander une gril
 - **Livraison :** quartiers livrés par chaque site, frais, minimums.
 - **Équipe :** cuisine, comptoir, livreurs, responsables. Chacun ne voit que son site, la gérante voit tout.
 - **Suivi en direct** de toutes les commandes de tous les sites.
-- **Caisse du jour :** ce qui a été payé par Orange Money, par MoMo, en espèces, et ce que chaque livreur doit remettre.
+- **Caisse du jour :** ce qui a été payé par Orange Money et par MoMo, site par site.
 - **Chiffres** par site et par jour : chiffre d'affaires, nombre de commandes, panier moyen, répartition livraison, à emporter et sur place, temps moyen de préparation et de livraison, commandes annulées et pourquoi, produits les plus vendus, quartiers qui commandent le plus, clients qui reviennent.
 - **Fichier clients :** numéro, quartier, nombre de commandes, dernière commande, accord pour recevoir des offres. Plus tard : envoi de promotions par WhatsApp aux clients qui ont donné leur accord.
 - **Exports** Excel ou CSV pour la comptabilité.
@@ -184,9 +179,9 @@ Une seule base pour tous les sites (PostgreSQL). Chaque membre de l'équipe ne v
 | `adresses` | client, quartier, point de repère, position GPS, consignes |
 | `commandes` | numéro, site, client, mode, statut, sous-total, frais de livraison, remise, total, heure souhaitée, heure estimée |
 | `lignes_commande` | produit, options, quantité, prix au moment de la commande |
-| `paiements` | commande, moyen (Orange Money, MoMo, espèces), numéro débité, agrégateur, référence de transaction, montant, statut, date, remboursement |
+| `paiements` | commande, opérateur (Orange Money ou MoMo), numéro débité, agrégateur, référence de transaction, montant, statut, date, remboursement |
 | `evenements` | commande, ancien et nouveau statut, qui, quand |
-| `livraisons` | commande, livreur, heure d'acceptation, de départ et de livraison, encaissé ou non, comment |
+| `livraisons` | commande, livreur, heure d'acceptation, de départ et de livraison |
 | `equipe` | personne, rôle (cuisine, comptoir, livreur, responsable, gérante), sites |
 
 Les données appartiennent au restaurant. On peut les exporter à tout moment et les brancher sur Excel, Google Sheets ou un outil de tableaux de bord.
@@ -248,10 +243,10 @@ flowchart LR
 
 | Situation | Ce que fait le logiciel |
 |---|---|
-| Le client ne valide pas la demande de paiement | Au bout de 5 minutes, le bot propose de renvoyer la demande, de changer de numéro ou d'opérateur, ou de payer à la livraison. Annulation à 20 minutes |
+| Le client ne valide pas la demande de paiement | Au bout de 5 minutes, le bot propose de renvoyer la demande ou de changer de numéro ou d'opérateur. Annulation à 20 minutes |
 | Solde insuffisant | Même chose |
 | Le client envoie une capture d'écran de paiement | Le bot explique que le paiement est confirmé automatiquement. La capture ne vaut pas paiement |
-| Réseau Orange ou MTN en panne | Le bot propose le paiement à la livraison |
+| Réseau Orange ou MTN en panne | Le bot propose de payer avec l'autre opérateur, ou de réessayer plus tard |
 | Paiement reçu après l'annulation | Remboursement sur le numéro du client, ou commande réactivée si le site peut la préparer |
 | Le client paie deux fois | Le deuxième paiement est remboursé automatiquement |
 | Quartier non livré | Proposition de commande à emporter dans le site le plus proche |
@@ -275,7 +270,7 @@ Les durées sont des estimations de développement pour une personne. Elles sont
 | Phase | Contenu | Durée estimée | Ce que gagne le restaurant |
 |---|---|---|---|
 | **1. Zéro vérification** (un site pilote) | Base de données, bot rebranché sur la base, paiement Orange Money et MoMo vérifié automatiquement, écran cuisine, ticket imprimé, messages automatiques au client | 2 à 3 semaines | Plus de vérification de paiement à la main, plus d'hôtesse qui porte les commandes en cuisine |
-| **2. Tous les sites et la livraison** | Choix du site selon le quartier, frais de livraison, appli livreur avec encaissement mobile money, écran comptoir, déploiement sur tous les sites | 2 à 3 semaines | Les commandes vont seules au bon site et au bon livreur |
+| **2. Tous les sites et la livraison** | Choix du site selon le quartier, frais de livraison, appli livreur, écran comptoir, déploiement sur tous les sites | 2 à 3 semaines | Les commandes vont seules au bon site et au bon livreur |
 | **3. Pilotage** | Connexion à la caisse, espace gérante complet, caisse du jour, chiffres, exports, ruptures, capacité, mode pause | 2 à 4 semaines | La gérante pilote tous les sites depuis un seul écran |
 
 Si le compte chez l'agrégateur n'est pas prêt à la fin de la phase 1, on démarre avec la solution de transition (lecture des SMS du numéro marchand).
@@ -310,11 +305,10 @@ Ordres de grandeur, tous à vérifier avant de chiffrer l'offre. Pour les conver
 - Combien de temps pour préparer une commande ? Combien de pizzas un four peut-il sortir par quart d'heure ?
 
 **Le paiement**
-- Quelle part Orange Money, MoMo, espèces ?
+- Quelle part Orange Money, quelle part MoMo ?
 - Ont-ils des comptes marchands Orange Money et MoMo ? Un par site ou un pour l'enseigne ?
 - Comment la vérification se fait-elle aujourd'hui (SMS, capture d'écran, appli) ? Ont-ils déjà eu des fausses captures ?
 - Où doit arriver l'argent : compte marchand, compte bancaire ?
-- Veulent-ils garder le paiement à la livraison ?
 - Qui fait les remboursements aujourd'hui ?
 
 **La livraison**
