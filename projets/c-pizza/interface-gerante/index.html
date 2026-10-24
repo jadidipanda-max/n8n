@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C Pizza — Tableau de bord</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400..700&family=Nunito+Sans:wght@400..800&display=swap">
+<link rel="stylesheet" href="styles.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="title">
+      <h1>Tableau de bord</h1>
+      <p class="when">Vendredi 24 octobre · <span id="clock">19:06</span> · tous les points de vente</p>
+    </div>
+    <button type="button" class="live" id="live" data-action="live" data-key="live" aria-pressed="true"><span class="dot" aria-hidden="true"></span><span id="live-text">En direct</span></button>
+    <div class="spacer"></div>
+    <nav class="nav" aria-label="Réglages">
+      <a href="#" data-action="soon">Carte et prix</a>
+      <a href="#" data-action="soon">Quartiers et frais</a>
+      <a href="#" data-action="soon">Équipe</a>
+      <a href="#" data-action="soon">Exports</a>
+    </nav>
+  </header>
+
+  <section class="kpis" id="kpis" aria-label="Chiffres du jour"></section>
+
+  <div class="layout">
+    <section class="card map-card" aria-labelledby="map-title">
+      <div class="card-head">
+        <div>
+          <h2 id="map-title">La ville en ce moment</h2>
+          <p class="sub" id="map-sub"></p>
+        </div>
+        <div class="segmented" role="group" aria-label="Vue de la carte">
+          <button type="button" data-action="view" data-view="direct" data-key="view-direct" aria-pressed="true">En direct</button>
+          <button type="button" data-action="view" data-view="quartiers" data-key="view-quartiers" aria-pressed="false">Quartiers</button>
+        </div>
+      </div>
+      <div class="map" id="map"></div>
+      <div class="legend" id="legend" hidden>
+        <span><i class="sw" style="background:#EFE5D6;border:1px solid #D8CDBF"></i>0 à 2 commandes</span>
+        <span><i class="sw" style="background:#F3D9C2"></i>3 à 6</span>
+        <span><i class="sw" style="background:#EBB08F"></i>7 à 12</span>
+        <span><i class="sw" style="background:#D9785A"></i>13 et plus</span>
+        <span class="legend-tip">Les quartiers calmes sont ceux où envoyer une offre WhatsApp.</span>
+      </div>
+      <div class="chart-wrap">
+        <div class="card-head">
+          <h3>Commandes par heure</h3>
+          <div class="legend">
+            <span><i class="sw" style="background:#B8381F"></i><span id="chart-mine">Point de vente</span></span>
+            <span><i class="sw" style="background:#E2D5C4"></i>les autres</span>
+            <span><i class="sw sw-ghost"></i>un vendredi habituel</span>
+          </div>
+        </div>
+        <div class="chart-scroll"><div class="chart" id="chart" role="img"></div></div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="card" aria-labelledby="alerts-title">
+        <h2 id="alerts-title">À regarder maintenant</h2>
+        <div class="alerts" id="alerts"></div>
+      </section>
+      <section class="wallet-section" aria-labelledby="wallet-title">
+        <div class="card-head">
+          <h2 id="wallet-title">Vos points de vente</h2>
+          <span class="sub">touchez une carte pour l’ouvrir</span>
+        </div>
+        <div class="wallet" id="wallet"></div>
+      </section>
+    </aside>
+  </div>
+
+  <section class="card" aria-labelledby="compare-title">
+    <h2 id="compare-title">Comparer les points de vente</h2>
+    <div id="compare"></div>
+  </section>
+
+  <p class="footnote">Exemple d’écran, chiffres fictifs. La démo ajoute une commande de temps en temps pour montrer le direct ; le bouton « En direct » l’arrête.</p>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
